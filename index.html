@@ -133,7 +133,7 @@ details.why>div{padding:0 12px 12px;color:var(--ink-2);display:flex;flex-directi
 input[type=text],input[type=date],select{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 12px;min-height:44px;width:100%}
 .inline-field input{width:110px}
 input[type=range]{width:100%;accent-color:var(--accent)}
-dialog{border:0;border-radius:22px;background:var(--card);color:var(--ink);padding:20px;width:min(440px,calc(100vw - 24px));max-height:calc(100% - 24px);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog{overflow:auto;-webkit-overflow-scrolling:touch;border:0;border-radius:22px;background:var(--card);color:var(--ink);padding:20px;width:min(440px,calc(100vw - 24px));max-height:calc(100% - 24px);box-shadow:0 20px 60px rgba(0,0,0,.25)}
 dialog::backdrop{background:rgba(0,0,0,.35)}
 form.f{display:flex;flex-direction:column;gap:12px}
 form.f label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500}
@@ -858,7 +858,7 @@ function checkDetail(c,t,proj){
 
 /* ---- Render ---- */
 function render(){
-  $("#banner").innerHTML=sample?`<div class="banner"><p><strong>These are example numbers</strong> so you can see how it works. Nothing here is yours yet.</p><button class="btn primary" data-act="start">Use my own numbers</button></div>`:"";
+  $("#banner").innerHTML=sample?`<div class="banner"><p><strong>These are example numbers</strong> so you can see how it works. Nothing here is yours yet.</p><div class="actions"><button class="btn" data-act="guide">How it works</button><button class="btn primary" data-act="start">Use my own numbers</button></div></div>`:"";
   setStatus();
   const t=L.totals(plan),proj=L.project(plan,TODAY,90),f=flowCats(t);
   renderHome(t,proj,f);renderFlow(t,proj,f);renderSave(t,proj,f);renderLearn(t,proj);renderAccounts(t);
@@ -936,17 +936,14 @@ function renderHome(t,proj,f){
   const el=$("#v-home"),l=todaysLesson();
   const lesson=`<div class="card"><div class="stack"><div class="row"><span class="eyebrow">Today's lesson · ${esc(l.topic)}</span>${learn.streak>1?`<span class="chip">${learn.streak}-day streak</span>`:""}</div><h2 style="font-size:1.3rem">${esc(l.title)}</h2><p>${esc(l.body[0])}</p><div><a class="btn primary" href="#learn" data-act="open-today">Read the rest</a></div></div></div>`;
   if(!sample&&!plan.accounts.length&&!plan.incomes.length&&!plan.bills.length&&!txs.length){
-    el.innerHTML=lesson+`<div class="card"><div class="stack"><h2>Three steps to your first picture</h2><p class="muted">About ten minutes. Rounded numbers are fine.</p>
-    <ol class="steps"><li><span>Add what you own and owe.</span><button class="btn primary" data-act="add-account">Add an account</button></li>
-    <li><span>Import a bank or card statement. It finds your pay and bills for you.</span><button class="btn" data-act="go" data-go="flow" data-seg="check">Import</button></li>
-    <li><span>Confirm what it found, and add anything it missed.</span><button class="btn" data-act="go" data-go="accounts">Accounts</button></li></ol></div></div>`;
+    el.innerHTML=lesson+guideCard();
     return;
   }
   const order={crit:0,warn:1,info:2,good:3},cs=L.checks(plan,t,proj).sort((a,b)=>order[a.level]-order[b.level]);
   const scored=cs.filter(c=>c.level!=="info"),good=scored.filter(c=>c.level==="good").length,up=untilPayday(proj),cushion=Number(plan.cushion)||0;
   const acts=actions(t,proj,f).slice(0,3);
   const debts=plan.accounts.filter(a=>L.TYPES[a.type]&&L.TYPES[a.type].side==="owe"&&a.bal>0).sort((a,b)=>(b.rate||0)-(a.rate||0));
-  el.innerHTML=lesson+`
+  el.innerHTML=lesson+guideCard()+`
   <div class="card"><div class="stack"><div class="row"><h2>Your financial health</h2>${scored.length?`<span class="chip num">${good} of ${scored.length} healthy</span>`:""}</div>
     ${up?`<div class="trio num"><div><div class="lab">In your account</div><div class="val">${money(proj.start)}</div></div><div><div class="lab">Due before payday</div><div class="val">${money(up.sum)}</div></div><div><div class="lab">Lowest it gets</div><div class="val" style="color:var(--${up.low<0?"crit":up.low<cushion?"warn":"good"})">${money(up.low)}</div></div></div>
     <p class="num">${up.low<0?pill("crit","Short"):up.low<cushion?pill("warn","Tight"):pill("good","OK until payday")} Payday is ${dfmt(up.next,{weekday:"long"})}, ${up.days===1?"tomorrow":"in "+up.days+" days"}.${up.due.length?"":" Nothing is due before then."}</p>
@@ -961,6 +958,46 @@ function renderHome(t,proj,f){
     ${debts.length?`<details class="more"><summary><span>Your debts, most expensive first</span></summary><div class="body"><ul class="list">${debts.map(a=>`<li><div class="li-main"><div class="t">${esc(a.name)}</div><div class="s num">${a.rate?a.rate+"%":"No rate entered"}${a.limit?" · "+pct(a.bal,a.limit)+"% of limit":""}</div></div><div class="li-amt num"><div>${money(a.bal)}</div><div class="s">${a.rate?"about "+money(a.bal*a.rate/1200)+"/mo interest":""}</div></div></li>`).join("")}</ul><p class="muted">Extra dollars save the most interest at the top of this list.</p></div></details>`:""}
     ${why("Net worth is everything you own minus everything you owe. It is the single best measure of whether you are getting ahead. It rises when you save, when you pay down debt, and when what you own grows in value. Update your balances once a month and the line above becomes your long-term scoreboard.")}
   </div></div>`;
+}
+
+/* ---- Getting started guide ---- */
+function guideSteps(){
+  const standalone=!!navigator.standalone||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches);
+  return [
+   {t:"Put it on your Home Screen",d:"On iPhone, open the app's address in Safari, tap Share, then Add to Home Screen. On a Mac, use File, then Add to Dock. Always open it from that icon so your numbers stay in one place.",done:standalone||!!plan.guideSkipInstall,skip:true},
+   {t:"Add your accounts",d:"Start with chequing, then savings, cards, line of credit, mortgage, loans and investments. Rounded balances are fine. Tick \u201cBills come out of this account\u201d on your main chequing account.",done:!sample&&plan.accounts.length>0,go:"accounts",label:"Go to Accounts"},
+   {t:"Import a statement",d:"On your bank or card website, download two or three months of transactions as CSV and save the file to Files. Then choose it under Flow, Spending and leaks. Link it to the matching account and the app updates that balance for you.",done:!sample&&txs.length>0,go:"flow",seg:"check",label:"Import a statement"},
+   {t:"Confirm your pay and bills",d:"The app lists the regular deposits and charges it found. Tap Add on the ones that are right. Anything it missed, add under Accounts, including a weekly estimate for everyday spending.",done:!sample&&plan.incomes.length>0&&plan.bills.length>0,go:"flow",seg:"check",label:"Review what it found"},
+   {t:"Check your next 90 days",d:"Flow, Next 90 days shows your balance day by day. Set the cushion you want to keep in the account and look at the lowest point.",done:!sample&&!!plan.guideSeen90&&plan.incomes.length>0,go:"flow",seg:"days",label:"See the forecast"},
+   {t:"Give your leftover a job",d:"On the Save tab, slide to test an amount per payday, then add it to your plan or name a goal.",done:!sample&&(plan.goals.length>0||plan.bills.some(b=>b.cat==="savings")),go:"save",label:"Open Save"},
+   {t:"Read your first lesson",d:"A new one appears on Home each day. Mark it as learned to build your streak.",done:Object.keys(learn.done).length>0,go:"learn",label:"Open Learn"},
+   {t:"Save a backup",d:"Under Accounts, Export backup saves one small file with everything in it. Keep it somewhere safe. It is also how you copy your numbers to another device.",done:!!plan.backup,go:"accounts",label:"Go to Accounts"}
+  ];
+}
+function guideCard(){
+  if(sample||plan.guideHidden)return "";
+  const s=guideSteps(),done=s.filter(x=>x.done).length,next=s.find(x=>!x.done);
+  if(!next)return "";
+  return `<div class="card"><div class="stack"><div class="row"><h2>Getting started</h2><span class="chip num">${done} of ${s.length} done</span></div>
+    <div class="progress" role="img" aria-label="${done} of ${s.length} setup steps done"><i style="width:${done/s.length*100}%"></i></div>
+    <div><div class="eyebrow">Next</div><p><strong>${esc(next.t)}</strong></p><p class="small muted">${esc(next.d)}</p></div>
+    <div class="row"><div class="actions" style="justify-content:flex-start">${next.go?`<button class="btn primary" data-act="go" data-go="${next.go}" data-seg="${next.seg||""}">${esc(next.label)}</button>`:""}${next.skip?`<button class="btn primary" data-act="guide-skip">Skip, I will use it here</button>`:""}<button class="btn" data-act="guide">Open the guide</button></div><button class="btn small" data-act="guide-hide">Hide</button></div>
+  </div></div>`;
+}
+function openGuide(){
+  const dlg=$("#dlg"),s=guideSteps(),done=s.filter(x=>x.done).length;
+  const tabs=[["Home","Today's lesson, whether you are covered until payday, what you could do next, how last month went and your net worth."],["Flow","Where a typical month goes, your balance for the next 90 days, and your spending and leaks from imported statements."],["Save","What is left over, a slider to test an amount per payday, your emergency fund and your goals."],["Learn","The daily lesson, the full library, calculators to try and your streak."],["Accounts","Everything you own and owe, your paydays and bills, backups and this guide."]];
+  dlg.innerHTML=`<div class="stack" style="gap:16px"><div class="row"><h2 id="dlg-title">Getting started</h2><button class="btn small" id="g-close">Close</button></div>
+  <p class="muted">Waterline shows where your money goes, whether you are covered until payday and how to start saving, with a short lesson each day. Your numbers stay on this device. Setup takes about fifteen minutes.</p>
+  ${sample?`<p class="note">You are looking at example numbers. Tap \u201cUse my own numbers\u201d at the top of any page to begin. The steps below tick themselves off as you go.</p>`:`<div><div class="row small muted"><span>${done} of ${s.length} done</span></div><div class="progress" style="margin-top:6px"><i style="width:${done/s.length*100}%"></i></div></div>`}
+  <div><h3>Set up, step by step</h3><ul class="list">${s.map((x,i)=>`<li style="align-items:flex-start;flex-wrap:wrap"><span class="pill ${x.done?"good":"info"}" style="margin-top:2px" aria-label="${x.done?"Done":"Step "+(i+1)}">${x.done?"\u2713":i+1}</span><div class="li-main"><div class="t">${esc(x.t)}</div><div class="s">${esc(x.d)}</div>${x.go&&!x.done&&!sample?`<div style="margin-top:8px"><button class="btn small" data-act="go" data-go="${x.go}" data-seg="${x.seg||""}">${esc(x.label)}</button></div>`:""}</div></li>`).join("")}</ul></div>
+  <div><h3>What each tab is for</h3><ul class="list">${tabs.map(x=>`<li><div class="li-main"><div class="t">${x[0]}</div><div class="s">${x[1]}</div></div></li>`).join("")}</ul></div>
+  <div><h3>Your monthly routine, about two minutes</h3><ol class="small" style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>Import last month's statement for each account that can export one.</li><li>Tap Update balances for the accounts that cannot.</li><li>Confirm anything new under \u201cFound in your statements\u201d.</li><li>Read Home: last month, your health checks and what you could do next.</li><li>Every so often, export a backup.</li></ol></div>
+  <div><h3>Good to know</h3><ul class="small muted" style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>Anywhere you see \u201cWhat does this mean?\u201d, tap it for a plain explanation.</li><li>Tap a line with an arrow to open the detail behind it.</li><li>Leave out account and card numbers. Names and balances are all the app needs.</li><li>If a statement shows spending and deposits reversed, use Swap in and out beside that file.</li><li>If a store lands in the wrong category, fix it once under Where it went, By place, and the app remembers.</li><li>The health checks and lessons are general education, not personal financial or tax advice.</li></ul></div>
+  </div>`;
+  dlg.querySelector("#g-close").addEventListener("click",()=>dlg.close());
+  if(dlg.showModal)dlg.showModal();else dlg.setAttribute("open","");
+  dlg.scrollTop=0;
 }
 
 /* ---- Statement helpers ---- */
@@ -1275,6 +1312,7 @@ function renderAccounts(t){
     <div class="actions" style="justify-content:flex-start">${sample?"":`<button class="btn" data-act="export">Export backup</button>`}<label class="btn" for="imp">Import backup</label><input type="file" id="imp" accept=".json,application/json" hidden>${sample?"":`<button class="btn danger" data-act="erase">Erase everything</button>`}</div>
     <p class="note" id="data-note" hidden></p>
   </div></div>
+  <div class="card"><div class="row"><div class="li-main"><div class="t">Getting started guide</div><div class="s">Setup steps, a tour of the tabs and the monthly routine.</div></div><button class="btn" data-act="guide">Open</button></div></div>
   <div class="card"><div class="stack"><h2>Put it on your Home Screen</h2><p class="small muted"><strong>iPhone:</strong> open this page in Safari, tap the Share button, then Add to Home Screen. Open it from the new icon from then on, and enter your numbers there. <strong>Mac:</strong> in Safari choose File, then Add to Dock. After the first visit it opens without an internet connection.</p></div></div>`;
   $("#imp").addEventListener("change",async e=>{
     const file=e.target.files[0];if(!file)return;const note=$("#data-note");
@@ -1356,9 +1394,12 @@ document.addEventListener("click",e=>{
   if(act==="edit-income")return openForm("income",b.dataset.id);
   if(act==="edit-bill")return openForm("bill",b.dataset.id);
   if(act==="edit-goal")return openForm("goal",b.dataset.id);
-  if(act==="seg"){flowSeg=b.dataset.v;render();return;}
+  if(act==="guide")return openGuide();
+  if(act==="guide-hide"){plan.guideHidden=true;save();render();return;}
+  if(act==="guide-skip"){plan.guideSkipInstall=true;save();render();return;}
+  if(act==="seg"){flowSeg=b.dataset.v;if(flowSeg==="days"&&!sample&&!plan.guideSeen90){plan.guideSeen90=true;save();}render();return;}
   if(act==="balances"){if(!sample&&plan.accounts.length)openBalances();return;}
-  if(act==="go"){const go=b.dataset.go,seg=b.dataset.seg;if(seg==="balances"){if(!sample)openBalances();return;}if(go==="flow"&&seg)flowSeg=seg;if(go==="learn"&&seg)lessonId=seg;render();if(go)location.hash="#"+go;window.scrollTo(0,0);return;}
+  if(act==="go"){const go=b.dataset.go,seg=b.dataset.seg;if(seg==="balances"){if(!sample)openBalances();return;}if($("#dlg").open)$("#dlg").close();if(go==="flow"&&seg)flowSeg=seg;if(go==="flow"&&seg==="days"&&!sample&&!plan.guideSeen90){plan.guideSeen90=true;save();}if(go==="learn"&&seg)lessonId=seg;render();if(go)location.hash="#"+go;window.scrollTo(0,0);return;}
   if(act==="sugg-add"){const s=suggestions().find(x=>x.key===b.dataset.key);if(s)openForm(s.kind,null,{name:s.name,amt:s.amt,freq:s.freq,date:s.next,cat:s.cat||"",_key:s.key});return;}
   if(act==="sugg-skip"){plan.seen=plan.seen||{};plan.seen[b.dataset.key]=1;save();render();return;}
   if(act==="go-check"){flowSeg="check";render();location.hash="#flow";window.scrollTo(0,0);return;}
