@@ -106,6 +106,7 @@ details.why>summary{cursor:pointer;padding:9px 12px;color:var(--accent);font-wei
 details.why>summary::-webkit-details-marker{display:none}
 details.why>summary::before{content:"\24D8  "}
 details.why>div{padding:0 12px 12px;color:var(--ink-2);display:flex;flex-direction:column;gap:8px}
+.fx{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem;line-height:1.55;background:var(--fill);border-radius:10px;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .seg{display:flex;background:var(--fill);border-radius:10px;padding:2px;gap:2px}
 .seg button{flex:1;white-space:nowrap;border:0;background:none;border-radius:8px;padding:7px 6px;font-size:.86rem;font-weight:500;cursor:pointer;color:var(--ink)}
 .seg button[aria-pressed="true"]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -179,6 +180,8 @@ section[hidden]{display:none}
     <section id="v-save" class="stack" hidden></section>
     <section id="v-learn" class="stack" hidden></section>
     <section id="v-accounts" class="stack" hidden></section>
+    <section id="v-formulas" class="stack" hidden></section>
+    <section id="v-mortgage" class="stack" hidden></section>
   </main>
 </div>
 <nav class="bar" aria-label="Sections"><div>
@@ -730,6 +733,12 @@ const CA=[
  ex:"Contribute 4% of an $80,000 salary with a full match and $3,200 becomes $6,400 a year.",
  quiz:{q:"Your employer matches contributions up to 4% of pay and you put in 2%. What are you giving up?",opts:["Nothing","Half of the available match","Your tax deduction"],a:1,why:"The employer would match another 2% of pay that you are not contributing."},
  look:["group RRSP matching","DPSP vesting","pension adjustment"]}
+,
+{id:"ca-fixed-variable",topic:T,title:"Fixed and variable mortgages",
+ body:["A fixed rate is locked for your term, commonly five years, so the payment is known in advance. A variable rate is set as your lender's prime rate plus or minus a fixed amount, and prime follows the Bank of Canada's policy rate, so it can change during the term.","There are two kinds of variable mortgage. With one, your payment moves whenever prime does. With the other, your payment stays the same and the split shifts: when rates rise, more goes to interest and less to the loan. Term and amortization are different things: the term is how long your rate deal lasts, and the amortization is how long the whole loan takes to repay."],
+ ex:"Prime at 4.95% with a mortgage at prime minus 0.50 means a rate of 4.45%. If prime rises by 0.25, the rate becomes 4.70% the same day.",
+ quiz:{q:"Your mortgage has a five-year term and a 25-year amortization. What happens after five years?",opts:["The mortgage is paid off","You renew at whatever rates are on offer for the balance that remains","Nothing changes for 25 years"],a:1,why:"The term is only the length of the current rate deal. The remaining balance is renewed, usually several times, until the amortization ends."},
+ look:["fixed vs variable mortgage Canada","trigger rate","mortgage prepayment penalty"]}
 ];
 /* Interleave so Canadian lessons come up often */
 const base=window.LESSONS,out=[];let i=0,j=0;
@@ -771,6 +780,7 @@ const guessCat=n=>{n=n.toLowerCase();
   if(/netflix|spotify|stream|gym|subscription|dining|restaurant|fun|travel/.test(n))return "fun";
   return "other";};
 const emptyPlan=()=>({v:2,accounts:[],incomes:[],bills:[],goals:[],cushion:500,efMonths:3,marks:{},history:{},backup:null,catMap:{},seen:{}});
+const VERSION="1.4, 11 Nov 2026";
 const LS="waterline-v2",LSL="waterline-learn";
 let plan=emptyPlan(),txs=[],sample=true,showAll=false,importNote=null,flowSeg="month",canSave=true,whatIf=null,lessonId=null;
 let learn={done:{},streak:0,last:null,today:null};
@@ -780,8 +790,8 @@ function makeSample(){
   const p=emptyPlan();const A=(name,type,bal,x)=>p.accounts.push(Object.assign({id:uid(),name,type,bal,updated:TODAY},x||{}));
   A("Everyday chequing","chequing",4200,{payFrom:true});A("Rainy day savings","savings",6500);
   A("Investment account","invest",38000,{reg:"TFSA"});A("Home","property",560000);
-  A("Rewards credit card","card",2850,{rate:20.99,limit:8000});A("Line of credit","loc",9400,{rate:8.2,limit:20000});
-  A("Mortgage","mortgage",412000,{rate:4.6});A("Car loan","loan",14300,{rate:6.9});
+  A("Rewards credit card","card",2850,{rate:20.99,limit:8000});A("Line of credit","loc",9400,{rate:8.2,limit:20000,rateType:"variable",spread:3.25});p.prime=4.95;p.primeUpdated=TODAY;
+  A("Mortgage","mortgage",412000,{rate:4.6,rateType:"fixed",pay:2480,payFreq:"monthly",renew:L.addMonths(TODAY,30)});A("Car loan","loan",14300,{rate:6.9});
   const dow=L.toD(TODAY).getUTCDay(),fri=L.addDays(TODAY,((5-dow)+7)%7||7);
   p.incomes.push({id:uid(),name:"Paycheque",amt:2950,freq:"biweekly",date:fri});
   const dom=d=>{const c=TODAY.slice(0,8)+String(d).padStart(2,"0");return c>=TODAY?c:L.addMonths(c,1);};
@@ -861,7 +871,7 @@ function render(){
   $("#banner").innerHTML=sample?`<div class="banner"><p><strong>These are example numbers</strong> so you can see how it works. Nothing here is yours yet.</p><div class="actions"><button class="btn" data-act="guide">How it works</button><button class="btn primary" data-act="start">Use my own numbers</button></div></div>`:"";
   setStatus();
   const t=L.totals(plan),proj=L.project(plan,TODAY,90),f=flowCats(t);
-  renderHome(t,proj,f);renderFlow(t,proj,f);renderSave(t,proj,f);renderLearn(t,proj);renderAccounts(t);
+  renderHome(t,proj,f);renderFlow(t,proj,f);renderSave(t,proj,f);renderLearn(t,proj);renderAccounts(t);renderFormulas();renderMortgage(f);
   route();
 }
 function todaysLesson(){
@@ -897,6 +907,7 @@ function actions(t,proj,f){
   if(t.income>0&&f.left<0)add("Close the monthly gap of "+money(-f.left),"Planned bills are higher than income. Start with the largest category.","See where it goes","flow","month");
   const stale=plan.accounts.filter(a=>a.updated&&L.diffDays(a.updated,TODAY)>35).length;
   if(stale)add(`Update ${stale} balance${stale>1?"s":""}`,"They were last changed over a month ago, so the picture is drifting.","Update balances","","balances");
+  if(plan.accounts.some(a=>a.rateType==="variable")&&plan.primeUpdated&&L.diffDays(plan.primeUpdated,TODAY)>60)add("Check your prime rate","It was last updated over two months ago. Your variable-rate figures depend on it.","Open","mortgage");
   const r=L.recap(txs,plan.catMap,TODAY);
   if(plan.accounts.length&&!r.a.n)add("Import last month's statement","It takes a minute and fills in how the month went.","Import","flow","check");
   if(t.topRate&&t.topRate.rate>=15)add(`Extra payments save the most on ${t.topRate.name}`,`At ${t.topRate.rate}% it costs about ${money(t.topRate.monthly)} a month, your most expensive debt.`,"Why this works","learn","avalanche-snowball");
@@ -953,6 +964,7 @@ function renderHome(t,proj,f){
   </div></div>
   ${acts.length?`<div class="card"><div class="stack"><h2>What you could do next</h2><ul class="list">${acts.map(a=>`<li style="flex-wrap:wrap"><div class="li-main"><div class="t">${esc(a.title)}</div><div class="s num">${esc(a.detail)}</div></div><button class="btn small" data-act="go" data-go="${a.go}" data-seg="${a.seg}">${esc(a.label)}</button></li>`).join("")}</ul></div></div>`:""}
   ${lastMonthCard()}
+  ${mortgageHomeCard()}
   <div class="card"><div class="stack"><div class="row"><span class="eyebrow">Net worth</span>${sample||!plan.accounts.length?"":`<button class="btn small" data-act="balances">Update balances</button>`}</div><span class="big num">${money(t.net)}</span><span class="muted small num">${money(t.own)} owned, ${money(t.owe)} owed</span>${spark()}
     <details class="more"><summary><span>Break it down</span></summary><div class="body">${typeBars(t)||"No accounts yet."}</div></details>
     ${debts.length?`<details class="more"><summary><span>Your debts, most expensive first</span></summary><div class="body"><ul class="list">${debts.map(a=>`<li><div class="li-main"><div class="t">${esc(a.name)}</div><div class="s num">${a.rate?a.rate+"%":"No rate entered"}${a.limit?" · "+pct(a.bal,a.limit)+"% of limit":""}</div></div><div class="li-amt num"><div>${money(a.bal)}</div><div class="s">${a.rate?"about "+money(a.bal*a.rate/1200)+"/mo interest":""}</div></div></li>`).join("")}</ul><p class="muted">Extra dollars save the most interest at the top of this list.</p></div></details>`:""}
@@ -993,11 +1005,139 @@ function openGuide(){
   <div><h3>Set up, step by step</h3><ul class="list">${s.map((x,i)=>`<li style="align-items:flex-start;flex-wrap:wrap"><span class="pill ${x.done?"good":"info"}" style="margin-top:2px" aria-label="${x.done?"Done":"Step "+(i+1)}">${x.done?"\u2713":i+1}</span><div class="li-main"><div class="t">${esc(x.t)}</div><div class="s">${esc(x.d)}</div>${x.go&&!x.done&&!sample?`<div style="margin-top:8px"><button class="btn small" data-act="go" data-go="${x.go}" data-seg="${x.seg||""}">${esc(x.label)}</button></div>`:""}</div></li>`).join("")}</ul></div>
   <div><h3>What each tab is for</h3><ul class="list">${tabs.map(x=>`<li><div class="li-main"><div class="t">${x[0]}</div><div class="s">${x[1]}</div></div></li>`).join("")}</ul></div>
   <div><h3>Your monthly routine, about two minutes</h3><ol class="small" style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>Import last month's statement for each account that can export one.</li><li>Tap Update balances for the accounts that cannot.</li><li>Confirm anything new under \u201cFound in your statements\u201d.</li><li>Read Home: last month, your health checks and what you could do next.</li><li>Every so often, export a backup.</li></ol></div>
-  <div><h3>Good to know</h3><ul class="small muted" style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>Anywhere you see \u201cWhat does this mean?\u201d, tap it for a plain explanation.</li><li>Tap a line with an arrow to open the detail behind it.</li><li>Leave out account and card numbers. Names and balances are all the app needs.</li><li>If a statement shows spending and deposits reversed, use Swap in and out beside that file.</li><li>If a store lands in the wrong category, fix it once under Where it went, By place, and the app remembers.</li><li>The health checks and lessons are general education, not personal financial or tax advice.</li></ul></div>
+  <div><h3>Good to know</h3><ul class="small muted" style="margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px"><li>Anywhere you see \u201cWhat does this mean?\u201d, tap it for a plain explanation.</li><li>Tap a line with an arrow to open the detail behind it.</li><li>Leave out account and card numbers. Names and balances are all the app needs.</li><li>If a statement shows spending and deposits reversed, use Swap in and out beside that file.</li><li>If a store lands in the wrong category, fix it once under Where it went, By place, and the app remembers.</li><li>Every formula the app uses is listed under Accounts, How the numbers are calculated.</li><li>The health checks and lessons are general education, not personal financial or tax advice.</li></ul></div>
   </div>`;
   dlg.querySelector("#g-close").addEventListener("click",()=>dlg.close());
   if(dlg.showModal)dlg.showModal();else dlg.setAttribute("open","");
   dlg.scrollTop=0;
+}
+
+/* ---- How the numbers are calculated ---- */
+const FORMULAS=[
+["Monthly amounts",[
+ ["Turning any schedule into a monthly figure","Weekly × 52 ÷ 12\nEvery 2 weeks × 26 ÷ 12\nTwice a month × 2\nEvery 3 months ÷ 3\nYearly ÷ 12\nOne-time items count as 0","A $2,950 pay every two weeks is 2,950 × 26 ÷ 12 = $6,392 a month.","Two months a year have three biweekly pays. The monthly figure spreads those evenly, so a single calendar month can look different."],
+ ["Left over each month","Monthly income − monthly bills and payments","$6,392 in − $5,732 out = $660.","Only counts what you have entered. Spending that is not in your bills list comes out of this."],
+ ["Needs, wants, saving","Needs = housing + debt payments + food and everyday + utilities, phone, insurance + transport + other\nWants = fun and subscriptions\nSaving = savings transfers + left over (if positive)\nEach ÷ monthly income","Needs of $5,472 on $6,392 of income is 86%.","The grouping is rough. The 50/30/20 marks are a common guide, not a rule."]
+]],
+["Net worth and debt",[
+ ["Net worth","Everything you own − everything you owe","$608,700 − $438,550 = $170,150.","Uses the balances and values you typed in, as of the date you last updated them. Property is whatever value you entered."],
+ ["Interest cost per month","For each debt: balance × yearly rate ÷ 12, then added together","$2,850 at 20.99% is 2,850 × 0.2099 ÷ 12 = about $50 a month.","An estimate. Lenders calculate interest daily and mortgages compound differently, so your statement will differ a little."],
+ ["Credit in use","Balances on cards and lines of credit ÷ their combined limits","$12,250 owed on $28,000 of limits = 44%.","Flagged above 30% and again above 50%. Only accounts with a limit entered are included."]
+]],
+["Forecast and payday",[
+ ["Balance, day by day","Start = balances of accounts marked “Bills come out of this account”\nEach day = previous day + paydays on that date − bills on that date\nLowest point = the smallest daily balance in the next 90 days","$4,200 today, −$190 and −$230 on the 12th, +$2,950 on the 13th gives $3,780 then $6,730.","Only as current as the balance you last entered, and it knows only the paydays and bills in your list."],
+ ["How future dates are worked out","Weekly: every 7 days from the date you gave\nEvery 2 weeks: every 14 days\nMonthly, quarterly, yearly: the same day of the month (the last day in shorter months)\nTwice a month: the day you gave and the day 15 days apart from it","A bill dated the 31st falls on the 30th in a 30-day month.","Does not move dates for weekends or holidays."],
+ ["Until payday","Due before payday = bills dated before your next payday\nLowest it gets = the smallest daily balance before that date","","Compared with your cushion: below it shows Tight, below zero shows Short."],
+ ["Cash cover","(Chequing + savings balances) ÷ monthly bills and payments","$10,700 ÷ $5,732 = 1.9 months.","Under 1 month shows Low, under 3 shows Building."]
+]],
+["Saving",[
+ ["Try an amount","Per month = amount × paydays per month\nPer year = per month × 12\nFive years = per month × 60\nThe 90-day forecast is then re-run with that amount taken out each payday","$150 every two weeks is 150 × 26 ÷ 12 = $325 a month, $3,900 a year.","No interest or investment growth is included."],
+ ["Emergency fund","Target = months chosen × essential monthly costs\nEssentials = all bills except fun and savings\nCounted so far = balances in savings accounts\nTime to target = (target − counted) ÷ amount saved per month","3 × $5,472 = about $16,416.","Chequing is left out on purpose, since it is spoken for by bills."],
+ ["Goals","To go = target − saved\nWith a date: to go ÷ months until the date\nWithout a date: to go ÷ your trial monthly amount","$2,100 to go over 8 months is about $264 a month.","Months are counted as days ÷ 30.44."]
+]],
+["Statements",[
+ ["Spent, came in, kept","Spent = money out, leaving out transfers, card and loan payments, and moves to savings\nCame in = deposits, leaving out transfers\nKept = came in − spent","","Transfers are recognised by words such as payment, transfer and e-transfer. Mortgage, rent, loan and insurance lines are kept as spending. If a card is not imported, its spending is missing."],
+ ["Categories","Each description is matched against lists of store and service names. Your own choice for a merchant always wins. Anything unmatched goes to Other.","","Matching is by keyword, so check By place and correct anything that landed wrong."],
+ ["Regular pay and bills found","Same source at least twice\nAt least 60% of the amounts within 15% of the middle amount\nTypical gap between dates: 6 to 8 days weekly, 13 to 14 every two weeks, 15 to 17 twice a month, 26 to 33 monthly\nDeposits must be $200 or more to count as pay","","Suggestions only. Nothing is added until you confirm it."],
+ ["Repeating charges","Same merchant in two or more months, similar amounts, no more than about 1.6 times a month\nMonthly cost = middle amount × number of charges ÷ months between first and last\nYearly = monthly × 12\nPrice-rise flag: latest charge more than 3% and $0.50 above the earliest","Four charges of $54 across four months is $54 a month, $648 a year.",""],
+ ["Small and frequent","A place you pay at least 4 times a month with a middle amount under $30\nMonthly = total spent there ÷ months of data","","Months of data = days between first and last transaction ÷ 30.44."],
+ ["Possible double charges","Same merchant, same amount of $5 or more, within one day","","Some are real repeat purchases."],
+ ["Everyday spending estimate","Variable spending (food, fun, transport, other, not already found as regular) ÷ number of weeks of data, rounded to $5","",""]
+]],
+["Mortgage",[
+ ["Monthly interest rate","Fixed: (1 + yearly rate \u00f7 2)^(1/6) \u2212 1\nVariable: yearly rate \u00f7 12\nVariable rate = prime + your spread","4.60% fixed is (1.023)^(1/6) \u2212 1 = 0.3797% a month. Prime 4.95% + 3.25 = 8.20% variable.","Fixed uses twice-a-year compounding, as Canadian fixed mortgages do."],
+ ["Where a payment goes","Interest this month = balance \u00d7 monthly rate\nPays down loan = monthly payments \u2212 interest","$412,000 \u00d7 0.3797% = $1,564 interest. A $2,480 payment leaves $916 for the loan.","Weekly and biweekly payments are converted to a monthly amount first."],
+ ["Time left and interest to come","Months = \u2212ln(1 \u2212 rate \u00d7 balance \u00f7 payment) \u00f7 ln(1 + rate)\nInterest to come = months \u00d7 payment \u2212 balance","","Assumes today's rate and payment never change."],
+ ["Payment at a different rate","Payment = balance \u00d7 new rate \u00f7 (1 \u2212 (1 + new rate)^\u2212months left)\nFixed: uses the balance you will owe at renewal\nBalance at renewal = B \u00d7 (1 + r)^k \u2212 payment \u00d7 ((1 + r)^k \u2212 1) \u00f7 r, for k months","","Keeps the same number of months left so the comparison is like for like."],
+ ["Extra payments","Re-run time left with payment + extra\nInterest saved = interest to come before \u2212 interest to come after","","Check your prepayment limits before paying extra."]
+]],
+["Learn calculators",[
+ ["Compound growth","r = yearly rate ÷ 12, n = months\nEnd value = start × (1 + r)^n + monthly amount × ((1 + r)^n − 1) ÷ r","$200 a month at 6% for 30 years: about $200,900.","Assumes a steady rate and ignores tax, fees and inflation."],
+ ["Rule of 72","Years to double ≈ 72 ÷ yearly rate\nExact = ln(2) ÷ ln(1 + rate)","At 6%: 12 years by the rule, 11.9 exactly.",""],
+ ["Debt payoff","r = yearly rate ÷ 12\nMonths = −ln(1 − r × balance ÷ payment) ÷ ln(1 + r)\nInterest = months × payment − balance","$3,000 at 20% paying $75: about 66.5 months and $1,985 of interest.","If the payment is not more than the first month's interest, the debt is never paid off."],
+ ["Mortgage payment","r = yearly rate ÷ 12, n = months\nPayment = balance × r ÷ (1 − (1 + r)^−n)\nMonth-one interest = balance × r","$400,000 at 5% over 25 years: about $2,338, of which $1,667 is interest in month one.","Uses monthly compounding. Canadian fixed-rate mortgages compound twice a year, so a lender's figure will be slightly lower."],
+ ["Fee comparison","End value = amount × (1 + return − fee)^years","$50,000 for 25 years at 6%: about $133,300 with a 2% fee, $204,700 with 0.2%.",""],
+ ["Inflation","Buying power = amount ÷ (1 + inflation)^years","$100 at 3% for 20 years buys what about $55 does today.",""]
+]]
+];
+function renderFormulas(){
+  const el=$("#v-formulas");if(!el)return;
+  el.innerHTML=`<div><a class="btn small" href="#accounts">Back to Accounts</a></div>
+  <div class="card"><div class="stack"><p>Every figure in this app comes from the formulas on this page. Nothing is hidden, and nothing is sent anywhere to be calculated. Check any of them with a calculator before you rely on it.</p><p class="small muted">All results are estimates from the numbers you enter. They are for understanding your own money, not personal financial or tax advice. Examples use the app's example numbers.</p></div></div>
+  ${FORMULAS.map(g=>`<div class="card"><div class="stack" style="gap:4px"><h2>${g[0]}</h2>${g[1].map(f=>`<details class="more"><summary><span>${f[0]}</span></summary><div class="body"><div class="fx">${esc(f[1])}</div>${f[2]?`<p><span class="eyebrow">Example</span><br>${esc(f[2])}</p>`:""}${f[3]?`<p class="muted"><span class="eyebrow">Keep in mind</span><br>${esc(f[3])}</p>`:""}</div></details>`).join("")}</div></div>`).join("")}
+  <div class="card"><p class="small muted">The app's full source is in its index.html file, so anyone can read exactly how each number is produced. Version ${VERSION}.</p></div>`;
+}
+
+/* ---- Mortgage ---- */
+let mDelta=.5,mExtra=0;
+const effM=(a,rate)=>{const r=(rate==null?Number(a.rate)||0:rate)/100;return a.rateType==="variable"?r/12:Math.pow(1+r/2,1/6)-1;};
+const nper=(B,i,p)=>p<=B*i+1e-9?Infinity:(i?-Math.log(1-i*B/p)/Math.log(1+i):B/p);
+const pmtFor=(B,i,n)=>i?B*i/(1-Math.pow(1+i,-n)):B/n;
+const yrs=n=>{if(!isFinite(n))return "never";const t=Math.round(n),y=Math.floor(t/12),m=t-y*12;return (y?y+(y===1?" year":" years"):"")+(y&&m?" ":"")+(m||!y?m+(m===1?" month":" months"):"");};
+const mortgages=()=>plan.accounts.filter(a=>a.type==="mortgage"&&a.bal>0);
+function mPay(a){
+  if(a.pay>0)return a.pay*(L.PER_MONTH[a.payFreq||"monthly"]||1);
+  if(mortgages().length===1){const b=plan.bills.find(b=>/mortgage/i.test(b.name));if(b)return (Number(b.amt)||0)*(L.PER_MONTH[b.freq]||1);}
+  return 0;
+}
+function applyPrime(){if(!(plan.prime>0))return;for(const a of plan.accounts)if(a.rateType==="variable"&&L.TYPES[a.type]&&L.TYPES[a.type].rate)a.rate=Math.round((plan.prime+(Number(a.spread)||0))*100)/100;}
+const rateLabel=a=>a.rateType==="variable"?`${a.rate}% variable (prime ${plan.prime||"?"}% ${(a.spread||0)<0?"−":"+"} ${Math.abs(a.spread||0).toFixed(2)})`:`${a.rate||0}% fixed`;
+function mortgageHomeCard(){
+  const ms=mortgages();if(!ms.length)return "";
+  const a=ms[0],i=effM(a),p=mPay(a),int=a.bal*i;
+  return `<div class="card"><div class="stack"><div class="row"><h2>Your mortgage</h2><a class="btn small" href="#mortgage">Open</a></div><p class="num">${money(a.bal)} at ${esc(rateLabel(a))}. ${p>0?`About ${money(int)} of this month's ${money(p)} in payments is interest and ${money(p-int)} pays down the loan.`:`Interest is running at about ${money(int)} a month.`}</p></div></div>`;
+}
+function rateScenario(a,f){
+  const B=a.bal,i=effM(a),p=mPay(a),n=nper(B,i,p),r2=Math.max(0,(Number(a.rate)||0)+mDelta),i2=effM(a,r2);
+  if(!(p>0))return `<p class="muted">Add your regular payment (Edit, under Accounts) to see what a rate change would do.</p>`;
+  if(!isFinite(n))return `<p class="note err">At the current rate your payment does not cover the interest, so the balance is not going down. Check the payment and rate you entered.</p>`;
+  let d=0,html="";
+  if(a.rateType!=="variable"){
+    const k=a.renew&&a.renew>TODAY?Math.min(Math.round(L.diffDays(TODAY,a.renew)/30.44),Math.floor(n)-1):0;
+    const g=Math.pow(1+i,k),Bk=i?B*g-p*(g-1)/i:B-p*k,p2=pmtFor(Bk,i2,n-k);d=p2-p;
+    html=`<p class="num">${k?`Nothing changes until you renew in ${dfmt(a.renew,{day:undefined,year:"numeric"})}, when you should owe about ${money(Bk)}.`:"Your rate is locked until your term ends."} Renewing at <strong>${r2.toFixed(2)}%</strong> would make the payment about <strong>${money(p2)}</strong> a month, which is ${money(Math.abs(d))} ${d>=0?"more":"less"} than now.</p>${a.renew?"":`<p class="small muted">Add your renewal date under Accounts and this uses the balance you will owe on that day.</p>`}`;
+  }else if(a.varPay==="fixed"){
+    const int2=B*i2;
+    if(p<=int2)html=`<p class="num">${pill("crit","Trigger rate")} At <strong>${r2.toFixed(2)}%</strong> the interest would be ${money(int2)} a month, more than your ${money(p)} payment. Lenders call this the trigger rate and normally require a higher payment or a lump sum.</p>`;
+    else{const n2=nper(B,i2,p);html=`<p class="num">At <strong>${r2.toFixed(2)}%</strong> your payment stays at ${money(p)}, but the interest part goes from ${money(B*i)} to ${money(int2)} a month. Time left changes from ${yrs(n)} to ${yrs(n2)}.</p>`;}
+  }else{
+    const p2=pmtFor(B,i2,n);d=p2-p;
+    html=`<p class="num">At <strong>${r2.toFixed(2)}%</strong> your payment would be about <strong>${money(p2)}</strong> a month, which is ${money(Math.abs(d))} ${d>=0?"more":"less"} than now.</p>`;
+  }
+  if(Math.abs(d)>=1&&f&&plan.incomes.length)html+=`<p class="num">${f.left-d<0?pill("warn","Tight"):pill("good","Fits")} Your monthly left over would go from ${money(f.left)} to ${money(f.left-d)}.</p>`;
+  return html;
+}
+function extraScenario(a){
+  const B=a.bal,i=effM(a),p=mPay(a),n=nper(B,i,p);
+  if(!(p>0)||!isFinite(n))return "";
+  if(!(mExtra>0))return `<p class="muted">Enter an amount to see the effect.</p>`;
+  const n2=nper(B,i,p+mExtra),saved=(n*p-B)-(n2*(p+mExtra)-B);
+  return `<p class="num">Paying ${money(mExtra)} more each month finishes <strong>${yrs(n-n2)} sooner</strong> and saves about <strong>${money(saved)}</strong> in interest, if the rate stayed the same.</p>`;
+}
+function renderMortgage(f){
+  const el=$("#v-mortgage");if(!el)return;
+  const ms=mortgages(),hasVar=plan.accounts.some(a=>a.rateType==="variable");
+  const primeCard=`<div class="card"><div class="stack"><h2>Prime rate</h2><div class="inline-field"><label for="prime" class="small">Prime today</label><input type="text" inputmode="decimal" id="prime" value="${plan.prime||""}" placeholder="e.g. 4.95" ${sample?"disabled":""}><span class="small muted">%${plan.primeUpdated?" · updated "+dfmt(plan.primeUpdated,{year:"numeric"}):""}</span></div>
+    ${why("Prime is the base rate your lender sets, and it follows the Bank of Canada's policy rate. Variable mortgages and most lines of credit are priced as prime plus or minus a fixed amount. Type the current figure here whenever it changes, which is usually only a few times a year, and every variable debt in the app updates. You can find it on your lender's website or your statement. The app does not look it up, because it never connects to anything outside itself.","What is prime?")}</div></div>`;
+  if(!ms.length){el.innerHTML=`<div><a class="btn small" href="#accounts">Back to Accounts</a></div><div class="card"><div class="stack"><h2>No mortgage yet</h2><p class="muted">Add your mortgage under Accounts, What you owe. Choose fixed or variable, and enter your regular payment, and this page shows where each payment goes and what a rate change would mean.</p><div><a class="btn primary" href="#accounts">Go to Accounts</a></div></div></div>${hasVar?primeCard:""}`;return;}
+  const deltas=[-1,-.5,-.25,.25,.5,1];
+  el.innerHTML=`<div><a class="btn small" href="#accounts">Back to Accounts</a></div>`+ms.map(a=>{
+    const B=a.bal,i=effM(a),p=mPay(a),int=B*i,n=nper(B,i,p),share=p>0?Math.min(100,int/p*100):0;
+    return `<div class="card"><div class="stack"><div class="row"><span class="eyebrow">${esc(a.name)}</span>${sample?"":`<button class="btn small" data-act="edit-account" data-id="${a.id}">Edit</button>`}</div><span class="big num">${money(B)}</span><span class="muted small num">${esc(rateLabel(a))}${a.rateType!=="variable"&&a.renew?" · renews "+dfmt(a.renew,{day:undefined,year:"numeric"}):""}</span>
+      ${p>0?`<div class="trio num"><div><div class="lab">Payments a month</div><div class="val">${money(p)}</div></div><div><div class="lab">Interest</div><div class="val">${money(int)}</div></div><div><div class="lab">Pays down loan</div><div class="val" style="color:var(--${p-int>0?"good":"crit"})">${money(p-int)}</div></div></div>
+      <div class="stackbar" role="img" aria-label="${Math.round(share)}% of each payment is interest"><i style="width:${share}%;background:var(--c-debt)" title="Interest ${money(int)}"></i><i style="width:${100-share}%;background:var(--accent)" title="Loan ${money(p-int)}"></i></div>
+      <div class="row small muted" style="justify-content:flex-start;gap:14px"><span><span class="dot" style="background:var(--c-debt)"></span> Interest ${Math.round(share)}%</span><span><span class="dot" style="background:var(--accent)"></span> Your loan ${Math.round(100-share)}%</span></div>
+      <p class="num">${isFinite(n)?`At this pace it is paid off in about <strong>${yrs(n)}</strong>, with roughly ${money(n*p-B)} of interest still to come.`:`This payment does not cover the interest, so the balance is not going down.`}</p>`:`<p class="note">Add your regular payment to see where it goes. Tap Edit.</p>`}
+      ${why("Each payment first covers the interest for that period, and only the rest reduces what you owe. Interest is charged on the balance, so early on, when the balance is large, most of the payment is interest. As the balance falls, more of each payment goes to the loan. Payments made weekly or every two weeks are shown here as a monthly amount. Time left assumes today's rate and payment never change, which they will at renewal or when prime moves, so treat it as a guide.","How to read this")}
+    </div></div>
+    <div class="card"><div class="stack"><h2>If rates ${a.rateType==="variable"?"move":"are different at renewal"}</h2>
+      <div class="seg" role="group" aria-label="Rate change">${deltas.map(d=>`<button data-act="mdelta" data-v="${d}" aria-pressed="${mDelta===d}">${d>0?"+":"−"}${Math.abs(d).toFixed(2)}</button>`).join("")}</div>
+      ${rateScenario(a,f)}
+      ${why(a.rateType==="variable"?"A variable rate moves whenever your lender's prime rate does. Depending on your mortgage, either your payment changes straight away, or your payment stays the same and more of it goes to interest, which stretches out the time left. The buttons test a change in percentage points. To keep the comparison fair, a changed payment is worked out to finish the mortgage on the same schedule as now.":"A fixed rate is locked for your term, commonly five years, so nothing changes until renewal. At renewal you take whatever rate is on offer for the balance that remains. The buttons test a renewal rate that many percentage points away from today's, keeping the same number of years left.","What does this mean?")}
+    </div></div>
+    ${p>0&&isFinite(n)?`<div class="card"><div class="stack"><h2>Pay a little extra</h2><div class="inline-field"><label for="m-extra" class="small">Extra each month</label><input type="text" inputmode="decimal" id="m-extra" value="${mExtra||""}" placeholder="e.g. 200"></div>${extraScenario(a)}
+      ${why("An extra payment goes entirely to the loan, so it removes balance that would otherwise be charged interest for years. Most mortgages allow some extra payment each year without penalty, but the limits vary, so check your mortgage's prepayment terms first. Whether this beats saving or investing the same money depends on your rate and your other goals.")}</div></div>`:""}`;
+  }).join("")+primeCard+`<div class="card"><p class="small muted">Fixed-rate figures use twice-a-year compounding, as Canadian fixed mortgages do. Variable figures use monthly compounding. Your lender's numbers may differ slightly. This page is for understanding, not mortgage advice. See How the numbers are calculated for the formulas.</p></div>`;
 }
 
 /* ---- Statement helpers ---- */
@@ -1297,7 +1437,7 @@ function renderLearn(t,proj){
 function renderAccounts(t){
   const el=$("#v-accounts");
   const grp=side=>plan.accounts.filter(a=>L.TYPES[a.type]&&L.TYPES[a.type].side===side);
-  const acct=a=>`<li><div class="li-main"><div class="t">${esc(a.name)}</div><div class="s num">${L.TYPES[a.type].label}${a.reg?" \u00b7 "+esc(a.reg):""}${a.rate?" · "+a.rate+"%":""}${a.limit?" · limit "+money(a.limit):""}${a.payFrom?" · bills come out of here":""}${a.updated?" · updated "+dfmt(a.updated):""}</div></div><div class="li-amt num">${money(a.bal)}</div>${sample?"":`<button class="btn small" data-act="edit-account" data-id="${a.id}">Edit</button>`}</li>`;
+  const acct=a=>`<li><div class="li-main"><div class="t">${esc(a.name)}</div><div class="s num">${L.TYPES[a.type].label}${a.reg?" \u00b7 "+esc(a.reg):""}${a.rate?" · "+a.rate+"%"+(a.rateType==="variable"?" variable":""):""}${a.limit?" · limit "+money(a.limit):""}${a.payFrom?" · bills come out of here":""}${a.updated?" · updated "+dfmt(a.updated):""}</div></div><div class="li-amt num">${money(a.bal)}</div>${sample?"":`<button class="btn small" data-act="edit-account" data-id="${a.id}">Edit</button>`}</li>`;
   const sched=(x,kind)=>`<li><div class="li-main"><div class="t">${esc(x.name)}</div><div class="s">${kind==="bill"?(CATS[x.cat]||CATS.other).label+" · ":""}${L.FREQ[x.freq]}, next ${x.date?dfmt((L.occurrences(x,TODAY,L.addDays(TODAY,400))[0])||x.date):"date not set"}</div></div><div class="li-amt num">${money(x.amt)}</div>${sample?"":`<button class="btn small" data-act="edit-${kind}" data-id="${x.id}">Edit</button>`}</li>`;
   el.innerHTML=`
   ${sample||!plan.accounts.length?"":`<div class="card"><div class="row"><div class="li-main"><div class="t">Quick update</div><div class="s">Copy today's balances from your banking app in one go.</div></div><button class="btn primary" data-act="balances">Update balances</button></div></div>`}
@@ -1311,7 +1451,10 @@ function renderAccounts(t){
     <p class="small muted">${plan.backup?"Last backup saved "+dfmt(plan.backup,{year:"numeric"})+".":"No backup saved yet."} A backup is a small file you keep wherever you like. It protects you if the browser's storage is cleared, and it is how you move to another device.</p>
     <div class="actions" style="justify-content:flex-start">${sample?"":`<button class="btn" data-act="export">Export backup</button>`}<label class="btn" for="imp">Import backup</label><input type="file" id="imp" accept=".json,application/json" hidden>${sample?"":`<button class="btn danger" data-act="erase">Erase everything</button>`}</div>
     <p class="note" id="data-note" hidden></p>
+    <p class="small muted">Version ${VERSION}</p>
   </div></div>
+  <div class="card"><div class="row"><div class="li-main"><div class="t">Your mortgage and prime rate</div><div class="s">Where each payment goes, and what a rate change would mean.</div></div><a class="btn" href="#mortgage">Open</a></div></div>
+  <div class="card"><div class="row"><div class="li-main"><div class="t">How the numbers are calculated</div><div class="s">The main formulas, with examples, so you can check them yourself.</div></div><a class="btn" href="#formulas">Open</a></div></div>
   <div class="card"><div class="row"><div class="li-main"><div class="t">Getting started guide</div><div class="s">Setup steps, a tour of the tabs and the monthly routine.</div></div><button class="btn" data-act="guide">Open</button></div></div>
   <div class="card"><div class="stack"><h2>Put it on your Home Screen</h2><p class="small muted"><strong>iPhone:</strong> open this page in Safari, tap the Share button, then Add to Home Screen. Open it from the new icon from then on, and enter your numbers there. <strong>Mac:</strong> in Safari choose File, then Add to Dock. After the first visit it opens without an internet connection.</p></div></div>`;
   $("#imp").addEventListener("change",async e=>{
@@ -1344,7 +1487,10 @@ function openForm(kind,id,preset){
       <label for="f-type">Type<select id="f-type">${opt(L.TYPES,v.type)}</select></label>
       <label for="f-name">Name<input type="text" id="f-name" value="${esc(v.name)}" placeholder="${T.side==="owe"?"e.g. Travel card":"e.g. Main chequing"}" autocomplete="off"></label>
       <label for="f-bal">${T.side==="owe"?"Balance owing":"Current balance"}<input type="text" inputmode="decimal" id="f-bal" value="${esc(v.bal)}" placeholder="0"></label>
-      ${T.rate?`<label for="f-rate">Interest rate, % a year<input type="text" inputmode="decimal" id="f-rate" value="${esc(v.rate||"")}" placeholder="e.g. 19.99"><span class="hint">It is printed on your statement.</span></label>`:""}
+      ${T.rate&&v.type!=="card"?`<label for="f-rt">Rate type<select id="f-rt"><option value="fixed" ${v.rateType!=="variable"?"selected":""}>Fixed</option><option value="variable" ${v.rateType==="variable"?"selected":""}>Variable: prime plus or minus</option></select></label>`:""}
+      ${T.rate&&(v.type==="card"||v.rateType!=="variable")?`<label for="f-rate">Interest rate, % a year<input type="text" inputmode="decimal" id="f-rate" value="${esc(v.rate||"")}" placeholder="e.g. 4.89"><span class="hint">It is printed on your statement.</span></label>`:""}
+      ${T.rate&&v.type!=="card"&&v.rateType==="variable"?`<label for="f-prime">Prime rate today, %<input type="text" inputmode="decimal" id="f-prime" value="${esc(plan.prime||"")}" placeholder="e.g. 4.95"><span class="hint">Your lender's prime. One setting shared by all your variable debts.</span></label><label for="f-spread">Your rate compared with prime<input type="text" inputmode="text" id="f-spread" value="${esc(v.spread==null?"":v.spread)}" placeholder="e.g. -0.50 or 1.25"><span class="hint">Prime minus 0.50 is entered as -0.50.</span></label>`:""}
+      ${v.type==="mortgage"?`<label for="f-mpay">Regular payment<input type="text" inputmode="decimal" id="f-mpay" value="${esc(v.pay||"")}" placeholder="0"></label><label for="f-pf">How often you pay<select id="f-pf">${["weekly","biweekly","semimonthly","monthly"].map(k=>`<option value="${k}" ${k===(v.payFreq||"monthly")?"selected":""}>${L.FREQ[k]}</option>`).join("")}</select></label>${v.rateType==="variable"?`<label for="f-vp">When prime changes<select id="f-vp"><option value="moves" ${v.varPay!=="fixed"?"selected":""}>My payment changes</option><option value="fixed" ${v.varPay==="fixed"?"selected":""}>My payment stays the same</option></select><span class="hint">Your mortgage documents or lender can tell you which.</span></label>`:`<label for="f-renew">Renewal date, optional<input type="date" id="f-renew" value="${esc(v.renew||"")}"></label>`}`:""}
       ${T.limit?`<label for="f-limit">Credit limit<input type="text" inputmode="decimal" id="f-limit" value="${esc(v.limit||"")}" placeholder="0"></label>`:""}
       ${v.type==="invest"?`<label for="f-reg">Kind of account<select id="f-reg">${["","TFSA","RRSP","FHSA","RESP","Workplace pension","Non-registered"].map(x=>`<option ${x===(v.reg||"")?"selected":""} value="${x}">${x||"Not set"}</option>`).join("")}</select></label>`:""}
       ${T.cash?`<label class="cb" for="f-pay"><input type="checkbox" id="f-pay" ${v.payFrom?"checked":""}>Bills come out of this account</label>`:""}`
@@ -1362,18 +1508,19 @@ function openForm(kind,id,preset){
     `<p class="note err" id="f-err" hidden></p>
      <div class="f-actions"><div>${cur?`<button type="button" class="btn danger" id="f-del">Delete</button>`:""}</div><div class="actions"><button type="button" class="btn" id="f-cancel">Cancel</button><button type="submit" class="btn primary">Save</button></div></div></form>`;
     const g=i=>dlg.querySelector("#"+i);
-    if(kind==="account")g("f-type").addEventListener("change",()=>{v.name=g("f-name").value;v.bal=g("f-bal").value;v.type=g("f-type").value;build();});
+    if(kind==="account"){const grab=()=>{const m={name:"f-name",bal:"f-bal",rate:"f-rate",limit:"f-limit",spread:"f-spread",pay:"f-mpay",payFreq:"f-pf",renew:"f-renew",varPay:"f-vp",rateType:"f-rt",type:"f-type"};for(const k in m){const e=g(m[k]);if(e)v[k]=e.value;}build();};g("f-type").addEventListener("change",grab);if(g("f-rt"))g("f-rt").addEventListener("change",grab);}
     g("f-cancel").addEventListener("click",()=>dlg.close());
     if(cur){let armed=false;g("f-del").addEventListener("click",()=>{if(!armed){armed=true;g("f-del").textContent="Tap again to delete";return;}list.splice(list.indexOf(cur),1);dlg.close();save();render();});}
     g("f").addEventListener("submit",e=>{
       e.preventDefault();const name=g("f-name").value.trim(),err=g("f-err"),fail=m=>{err.textContent=m;err.hidden=false;};
       if(!name)return fail("Give it a name so you can recognise it.");
       let o;
-      if(kind==="account"){const T2=L.TYPES[g("f-type").value];o={name,type:g("f-type").value,bal:Math.abs(num(g("f-bal").value)),updated:TODAY};if(T2.rate)o.rate=num(g("f-rate").value);if(T2.limit)o.limit=num(g("f-limit").value);if(T2.cash)o.payFrom=g("f-pay").checked;if(o.type==="invest")o.reg=g("f-reg").value;}
+      if(kind==="account"){const T2=L.TYPES[g("f-type").value];o={name,type:g("f-type").value,bal:Math.abs(num(g("f-bal").value)),updated:TODAY};if(T2.rate&&g("f-rate"))o.rate=num(g("f-rate").value);if(g("f-rt")){o.rateType=g("f-rt").value;if(o.rateType==="variable"){const pr=num(g("f-prime").value);if(!(pr>0)&&!(plan.prime>0)){err.textContent="Enter today's prime rate.";err.hidden=false;return;}if(pr>0&&pr!==plan.prime){plan.prime=pr;plan.primeUpdated=TODAY;}o.spread=num(g("f-spread").value);o.rate=Math.round((plan.prime+o.spread)*100)/100;}}if(o.type==="mortgage"){o.pay=Math.abs(num(g("f-mpay").value));o.payFreq=g("f-pf").value;if(g("f-renew"))o.renew=g("f-renew").value;if(g("f-vp"))o.varPay=g("f-vp").value;}if(T2.limit)o.limit=num(g("f-limit").value);if(T2.cash)o.payFrom=g("f-pay").checked;if(o.type==="invest")o.reg=g("f-reg").value;}
       else if(kind==="goal"){o={name,target:Math.abs(num(g("f-target").value)),saved:Math.abs(num(g("f-saved").value)),date:g("f-date").value};if(!o.target)return fail("Enter a target above zero.");}
       else{o={name,amt:Math.abs(num(g("f-amt").value)),freq:g("f-freq").value,date:g("f-date").value};if(!o.amt)return fail("Enter an amount above zero.");if(!o.date)return fail("Pick a date.");if(kind==="bill")o.cat=g("f-cat").value||guessCat(name);}
-      if(cur){for(const k of ["rate","limit","payFrom","reg"])delete cur[k];Object.assign(cur,o);}else list.push(Object.assign({id:uid()},o));
+      if(cur){for(const k of ["rate","limit","payFrom","reg","rateType","spread","pay","payFreq","renew","varPay"])delete cur[k];Object.assign(cur,o);}else list.push(Object.assign({id:uid()},o));
       if(v._key){plan.seen=plan.seen||{};plan.seen[v._key]=1;}
+      if(kind==="account")applyPrime();
       dlg.close();save();render();
     });
   }
@@ -1394,6 +1541,7 @@ document.addEventListener("click",e=>{
   if(act==="edit-income")return openForm("income",b.dataset.id);
   if(act==="edit-bill")return openForm("bill",b.dataset.id);
   if(act==="edit-goal")return openForm("goal",b.dataset.id);
+  if(act==="mdelta"){mDelta=Number(b.dataset.v);render();return;}
   if(act==="guide")return openGuide();
   if(act==="guide-hide"){plan.guideHidden=true;save();render();return;}
   if(act==="guide-skip"){plan.guideSkipInstall=true;save();render();return;}
@@ -1424,15 +1572,17 @@ document.addEventListener("input",e=>{
   if(w){const v={};w.querySelectorAll("input").forEach(i=>v[i.dataset.k]=num(i.value));w.querySelector(".out").innerHTML=W[w.dataset.w].calc(v);}
 });
 document.addEventListener("change",e=>{
+  if(e.target.id==="prime"){const v=num(e.target.value);if(v>0&&!sample){plan.prime=v;plan.primeUpdated=TODAY;applyPrime();save();}render();return;}
+  if(e.target.id==="m-extra"){mExtra=Math.max(0,num(e.target.value));render();return;}
   if(e.target.id==="sp-month"){spMonth=e.target.value;render();return;}
   if(e.target.classList.contains("set-cat")){plan.catMap=plan.catMap||{};plan.catMap[e.target.dataset.key]=e.target.value;save();render();return;}
   if(e.target.id==="cushion"){plan.cushion=Math.max(0,num(e.target.value));save();render();}
   if(e.target.id==="wi"){const t=L.totals(plan),f=flowCats(t);renderSave(t,null,f);}
 });
-const TITLES={home:"Home",flow:"Money flow",save:"Save",learn:"Learn",accounts:"Accounts"};
+const TITLES={home:"Home",flow:"Money flow",save:"Save",learn:"Learn",accounts:"Accounts",formulas:"How it is calculated",mortgage:"Your mortgage"};
 function route(){
   let h=location.hash.replace("#","");if(!TITLES[h])h="home";
-  for(const id in TITLES){$("#v-"+id).hidden=id!==h;const a=document.querySelector(`nav a[data-tab="${id}"]`);if(id===h)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");}
+  for(const id in TITLES){$("#v-"+id).hidden=id!==h;const a=document.querySelector(`nav a[data-tab="${id}"]`);if(!a)continue;if(id===h||((h==="formulas"||h==="mortgage")&&id==="accounts"))a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");}
   $("#page-title").textContent=TITLES[h];
   if(h==="flow")drawFlow();
   if(h==="learn"&&learn.last!==TODAY){touchLearn();render();}

@@ -1,5 +1,5 @@
 /* Waterline offline cache. Keeps a copy of the app's own files so it opens with no connection. */
-const C="waterline-4";
+const C="waterline-6";
 const FILES=["./","./index.html","./icon.png","./manifest.webmanifest"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()));});
