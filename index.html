@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- This policy lets the page load only its own files from its own address. It cannot contact any other server. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Waterline</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Waterline">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* Layout idea: quiet grouped cards on a soft grey ground, one clear number per card, detail tucked behind "Tell me more". */
+:root{
+  --bg:#f5f5f7; --card:#ffffff; --fill:#f2f2f7; --ink:#1d1d1f; --ink-2:#6e6e73; --line:#e5e5ea;
+  --accent:#0071e3; --accent-soft:#e9f2fd;
+  --good:#1f7a36; --good-soft:#e7f4ea; --warn:#a05a00; --warn-soft:#fcf1e1; --crit:#c2362d; --crit-soft:#fcebe9;
+  --c-housing:#2a78d6; --c-debt:#eb6834; --c-living:#1baf7a; --c-bills:#eda100; --c-transport:#e87ba4; --c-savings:#008300; --c-fun:#6250d6; --c-other:#8e8e93; --c-fees:#e34948;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --r:18px; --shadow:0 1px 2px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#1c1c1e; --card:#2c2c2e; --fill:#3a3a3c; --ink:#f2f2f7; --ink-2:#aeaeb2; --line:#3f3f42;
+    --accent:#4aa3ff; --accent-soft:#1f3550;
+    --good:#5fce85; --good-soft:#1f3a29; --warn:#e9ad4c; --warn-soft:#3d3018; --crit:#f47f77; --crit-soft:#452321;
+    --c-housing:#3987e5; --c-debt:#d95926; --c-living:#199e70; --c-bills:#c98500; --c-transport:#d55181; --c-savings:#008300; --c-fun:#9085e9; --c-other:#8e8e93; --c-fees:#e66767;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.47;-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.015em;font-weight:600}
+h1{font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
+h2{font-size:1.15rem}
+h3{font-size:1rem}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--accent);text-decoration:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:8px}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
+header.top{padding:calc(20px + env(safe-area-inset-top)) 4px 12px;display:flex;flex-direction:column;gap:2px}
+.status{font-size:.8rem;color:var(--ink-2)}
+nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:color-mix(in srgb,var(--card) 88%,transparent);-webkit-backdrop-filter:saturate(180%) blur(18px);backdrop-filter:saturate(180%) blur(18px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.bar div{max-width:680px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav.bar a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 7px;color:var(--ink-2);font-size:.68rem;font-weight:500}
+nav.bar a svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav.bar a[aria-current="page"]{color:var(--accent)}
+.stack{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.card>.stack{gap:12px}
+.banner{background:var(--accent-soft);border-radius:var(--r);padding:14px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.banner p{flex:1 1 220px;font-size:.92rem}
+.btn{appearance:none;border:0;background:var(--fill);border-radius:999px;padding:9px 16px;font-weight:500;cursor:pointer;min-height:40px;display:inline-flex;align-items:center;justify-content:center;color:var(--accent);font-size:.95rem}
+.btn:hover{filter:brightness(.97)}
+.btn.primary{background:var(--accent);color:#fff}
+@media (prefers-color-scheme: dark){.btn.primary{color:#0b1a2b}}
+.btn.small{padding:5px 12px;min-height:32px;font-size:.84rem}
+.btn.danger{color:var(--crit)}
+.btn[aria-pressed="true"]{background:var(--accent-soft)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.muted{color:var(--ink-2)}
+.small{font-size:.86rem}
+.eyebrow{font-size:.8rem;color:var(--ink-2);font-weight:500}
+.big{font-size:clamp(2.1rem,9vw,2.8rem);font-weight:700;letter-spacing:-.03em;line-height:1.08}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.trio>div{background:var(--fill);border-radius:14px;padding:10px 12px;min-width:0}
+.trio .lab{font-size:.76rem;color:var(--ink-2)}
+.trio .val{font-size:1.15rem;font-weight:600;letter-spacing:-.02em;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.tile{background:var(--card);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0;box-shadow:var(--shadow)}
+.tile .lab{font-size:.8rem;color:var(--ink-2)}
+.tile .val{font-weight:600;font-size:1.35rem;letter-spacing:-.02em;overflow-wrap:anywhere}
+.tile .sub{font-size:.78rem;color:var(--ink-2)}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:.76rem;font-weight:600;white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}
+.pill.info{background:var(--fill);color:var(--ink-2)}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ul.list>li{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line);min-width:0}
+ul.list>li:first-child{border-top:0}
+.li-main{min-width:0;flex:1 1 auto}
+.li-main .t{font-weight:500;overflow-wrap:anywhere}
+.li-main .s{font-size:.82rem;color:var(--ink-2)}
+.li-amt{text-align:right;flex:none}
+.li-amt .s{font-size:.78rem;color:var(--ink-2)}
+details.more{border-top:1px solid var(--line)}
+details.more:first-of-type{border-top:0}
+details.more>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 0}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::after{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(-45deg);opacity:.6}
+details.more[open]>summary::after{transform:rotate(45deg)}
+details.more>.body{padding:0 0 14px;display:flex;flex-direction:column;gap:8px;font-size:.92rem}
+details.why{background:var(--fill);border-radius:12px;font-size:.9rem}
+details.why>summary{cursor:pointer;padding:9px 12px;color:var(--accent);font-weight:500;list-style:none}
+details.why>summary::-webkit-details-marker{display:none}
+details.why>summary::before{content:"\24D8  "}
+details.why>div{padding:0 12px 12px;color:var(--ink-2);display:flex;flex-direction:column;gap:8px}
+.seg{display:flex;background:var(--fill);border-radius:10px;padding:2px;gap:2px}
+.seg button{flex:1;white-space:nowrap;border:0;background:none;border-radius:8px;padding:7px 6px;font-size:.86rem;font-weight:500;cursor:pointer;color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.stackbar{display:flex;height:22px;border-radius:8px;overflow:hidden;background:var(--fill);gap:2px}
+.stackbar i{display:block;height:100%;min-width:3px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar-row{display:grid;grid-template-columns:minmax(90px,32%) 1fr auto;gap:10px;align-items:center;font-size:.9rem}
+.bar-track{height:12px;position:relative;background:var(--fill);border-radius:6px}
+.bar-fill{height:100%;border-radius:6px;min-width:3px;background:var(--accent)}
+.bar-fill.owe{background:var(--c-debt)}
+.bar-tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);border-radius:1px}
+.progress{height:10px;background:var(--fill);border-radius:5px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:5px}
+#flow-chart{position:relative;touch-action:pan-y}
+#flow-chart svg{display:block;width:100%;height:auto}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--card);border-radius:10px;padding:6px 10px;font-size:.78rem;line-height:1.35;max-width:210px;z-index:2}
+.wk{font-size:.76rem;font-weight:600;color:var(--ink-2);padding:14px 0 2px}
+.in{color:var(--good)}
+.steps{counter-reset:s;display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.steps li>span{flex:1 1 200px}
+.steps li>span::before{content:counter(s) ". ";font-weight:600}
+.inline-field{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=text],input[type=date],select{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 12px;min-height:44px;width:100%}
+.inline-field input{width:110px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+dialog{border:0;border-radius:22px;background:var(--card);color:var(--ink);padding:20px;width:min(440px,calc(100vw - 24px));max-height:calc(100% - 24px);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+form.f{display:flex;flex-direction:column;gap:12px}
+form.f label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:500}
+form.f label.cb{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:.95rem}
+form.f .hint{font-weight:400;color:var(--ink-2);font-size:.8rem}
+.f-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:4px}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.note{font-size:.88rem;background:var(--fill);border-radius:12px;padding:10px 12px;color:var(--ink-2)}
+.note.err{background:var(--crit-soft);color:var(--crit)}
+.actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.struck{text-decoration:line-through;color:var(--ink-2)}
+.lesson p{max-width:62ch}
+.lesson .ex{background:var(--fill);border-radius:12px;padding:12px 14px;font-size:.94rem}
+.lesson .yours{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:.94rem}
+.widget{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.widget .ins{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.widget label{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--ink-2);font-weight:500}
+.widget .out{font-size:.95rem}
+.widget .out strong{font-size:1.2rem;letter-spacing:-.01em}
+.quiz{display:flex;flex-direction:column;gap:8px}
+.quiz button{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:44px}
+.quiz button.right{border-color:var(--good);background:var(--good-soft)}
+.quiz button.wrong{border-color:var(--crit);background:var(--crit-soft)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--fill);border-radius:999px;padding:3px 10px;font-size:.8rem;color:var(--ink-2)}
+.streak{display:flex;gap:16px;align-items:center}
+.streak .n{font-size:1.9rem;font-weight:700;letter-spacing:-.03em;line-height:1}
+section[hidden]{display:none}
+@media (prefers-reduced-motion:no-preference){.bar-fill,.progress i{transition:width .35s ease}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 id="page-title">Home</h1>
+    <div class="status" id="status" role="status"></div>
+  </header>
+  <div id="banner"></div>
+  <main>
+    <section id="v-home" class="stack"></section>
+    <section id="v-flow" class="stack" hidden></section>
+    <section id="v-save" class="stack" hidden></section>
+    <section id="v-learn" class="stack" hidden></section>
+    <section id="v-accounts" class="stack" hidden></section>
+  </main>
+</div>
+<nav class="bar" aria-label="Sections"><div>
+  <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>Home</a>
+  <a href="#flow" data-tab="flow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13m0 0-3-3m3 3-3 3M20 16H7m0 0 3-3m-3 3 3 3"/></svg>Flow</a>
+  <a href="#save" data-tab="save"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 14.5c.4 1 1.3 1.5 2.5 1.5 1.5 0 2.5-.8 2.5-2s-1-1.7-2.5-2-2.5-.8-2.5-2 1-2 2.5-2c1.200 0 2.100.5 2.500 1.500"/></svg>Save</a>
+  <a href="#learn" data-tab="learn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-2-1.500-4.500-2-8-2v13c3.500 0 6 .5 8 2 2-1.500 4.500-2 8-2V4c-3.500 0-6 .5-8 2zm0 0v13"/></svg>Learn</a>
+  <a href="#accounts" data-tab="accounts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.500" y="6" width="17" height="12" rx="2.500"/><path d="M3.500 10h17M7 14.500h3"/></svg>Accounts</a>
+</div></nav>
+<dialog id="dlg" aria-labelledby="dlg-title"></dialog>
+<script id="logic">
+/* ---------- Pure logic: dates, projection, CSV import, leak analysis ---------- */
+(function(G){
+"use strict";
+const TYPES={
+  chequing:{label:"Chequing",side:"own",cash:true},
+  savings:{label:"Savings",side:"own",cash:true},
+  invest:{label:"Investments",side:"own"},
+  property:{label:"Property",side:"own"},
+  other:{label:"Other asset",side:"own"},
+  card:{label:"Credit card",side:"owe",rate:true,limit:true},
+  loc:{label:"Line of credit",side:"owe",rate:true,limit:true},
+  mortgage:{label:"Mortgage",side:"owe",rate:true},
+  loan:{label:"Loan",side:"owe",rate:true}
+};
+const FREQ={once:"One time",weekly:"Every week",biweekly:"Every 2 weeks",semimonthly:"Twice a month",monthly:"Every month",quarterly:"Every 3 months",yearly:"Every year"};
+const PER_MONTH={once:0,weekly:52/12,biweekly:26/12,semimonthly:2,monthly:1,quarterly:1/3,yearly:1/12};
+const DAY=86400000;
+const toD=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(Date.UTC(y,m-1,d));};
+const iso=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>iso(new Date(toD(s).getTime()+n*DAY));
+const diffDays=(a,b)=>Math.round((toD(b)-toD(a))/DAY);
+function ymd(y,m0,d){const dim=new Date(Date.UTC(y,m0+1,0)).getUTCDate();return iso(new Date(Date.UTC(y,m0,Math.min(d,dim))));}
+function addMonths(s,n){const [y,m,d]=s.split("-").map(Number);const t=y*12+(m-1)+n;return ymd(Math.floor(t/12),((t%12)+12)%12,d);}
+
+function occurrences(item,from,to){
+  const out=[],start=item.date;if(!start||!FREQ[item.freq])return out;
+  const f=item.freq;
+  if(f==="once"){if(start>=from&&start<=to)out.push(start);return out;}
+  if(f==="weekly"||f==="biweekly"){
+    const step=f==="weekly"?7:14;let d=start;
+    if(d<from){const k=Math.ceil(diffDays(d,from)/step);d=addDays(d,k*step);}
+    while(d<=to){out.push(d);d=addDays(d,step);}
+    return out;
+  }
+  if(f==="semimonthly"){
+    const d1=Number(start.slice(8)),d2=d1<=15?d1+15:d1-15,lo=start>from?start:from;
+    let [y,m]=lo.split("-").map(Number);m--;
+    for(let i=0;i<200;i++){
+      const a=[ymd(y,m,Math.min(d1,d2)),ymd(y,m,Math.max(d1,d2))];
+      if(a[0]>to)break;
+      for(const d of a)if(d>=lo&&d<=to&&out[out.length-1]!==d)out.push(d);
+      m++;if(m>11){m=0;y++;}
+    }
+    return out;
+  }
+  const step=f==="monthly"?1:f==="quarterly"?3:12;
+  let n=0;
+  if(start<from){const [y1,m1]=start.split("-").map(Number),[y2,m2]=from.split("-").map(Number);n=Math.max(0,Math.floor(((y2*12+m2)-(y1*12+m1))/step)-1);}
+  for(let i=0;i<2000;i++,n++){const d=addMonths(start,n*step);if(d>to)break;if(d>=from)out.push(d);}
+  return out;
+}
+
+function totals(plan){
+  const t={own:0,owe:0,cash:0,payFrom:0,invest:0,cardBal:0,cardLimit:0,interest:0,byType:{},income:0,bills:0,topRate:null,payNames:[]};
+  for(const a of plan.accounts){
+    const T=TYPES[a.type];if(!T)continue;const b=Number(a.bal)||0;
+    t.byType[a.type]=(t.byType[a.type]||0)+b;
+    if(T.side==="own"){t.own+=b;if(T.cash){t.cash+=b;if(a.payFrom){t.payFrom+=b;t.payNames.push(a.name);}}if(a.type==="invest")t.invest+=b;}
+    else{
+      t.owe+=b;const r=Number(a.rate)||0;t.interest+=b*r/100/12;
+      if((a.type==="card"||a.type==="loc")&&Number(a.limit)>0){t.cardBal+=b;t.cardLimit+=Number(a.limit);}
+      if(b>0&&r>0&&(!t.topRate||r>t.topRate.rate))t.topRate={name:a.name,rate:r,bal:b,monthly:b*r/100/12};
+    }
+  }
+  for(const i of plan.incomes)t.income+=(Number(i.amt)||0)*(PER_MONTH[i.freq]||0);
+  for(const b of plan.bills)t.bills+=(Number(b.amt)||0)*(PER_MONTH[b.freq]||0);
+  t.net=t.own-t.owe;t.surplus=t.income-t.bills;
+  return t;
+}
+
+function project(plan,today,days){
+  const end=addDays(today,days),ev=[];
+  for(const i of plan.incomes)for(const d of occurrences(i,today,end))ev.push({date:d,name:i.name,amt:Number(i.amt)||0,kind:"in"});
+  for(const b of plan.bills)for(const d of occurrences(b,today,end))ev.push({date:d,name:b.name,amt:-(Number(b.amt)||0),kind:"out"});
+  ev.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.kind===b.kind?0:a.kind==="in"?-1:1));
+  const start=totals(plan).payFrom;let bal=start;
+  for(const e of ev){bal+=e.amt;e.bal=bal;}
+  const daily=[];let k=0;bal=start;let low={bal:start,date:today};
+  for(let i=0;i<=days;i++){
+    const d=addDays(today,i);
+    while(k<ev.length&&ev[k].date===d){bal=ev[k].bal;k++;}
+    daily.push({date:d,bal});
+    if(bal<low.bal)low={bal,date:d};
+  }
+  return {start,events:ev,daily,low,end:bal};
+}
+
+/* ---- CSV ---- */
+function parseCSV(text){
+  text=text.replace(/^﻿/,"");
+  const head=text.split(/\r?\n/).slice(0,8).join("\n");
+  const cnt=c=>head.split(c).length-1;
+  const delim=cnt("\t")>cnt(",")&&cnt("\t")>cnt(";")?"\t":cnt(";")>cnt(",")?";":",";
+  const rows=[];let row=[],cell="",q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=c;}
+    else if(c==='"')q=true;
+    else if(c===delim){row.push(cell);cell="";}
+    else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cell);cell="";if(row.some(x=>x.trim()!==""))rows.push(row);row=[];}
+    else cell+=c;
+  }
+  row.push(cell);if(row.some(x=>x.trim()!==""))rows.push(row);
+  return rows.map(r=>r.map(x=>x.trim()));
+}
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function parseDate(s,dayFirst){
+  if(!s)return null;s=s.trim();let m;
+  const ok=(y,mo,d)=>{y=+y;mo=+mo;d=+d;if(y<100)y+=2000;if(mo<1||mo>12||d<1||d>31||y<1990||y>2100)return null;return y+"-"+String(mo).padStart(2,"0")+"-"+String(d).padStart(2,"0");};
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/)))return ok(m[1],m[2],m[3]);
+  if((m=s.match(/^(\d{4})(\d{2})(\d{2})$/)))return ok(m[1],m[2],m[3]);
+  if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/)))return dayFirst?ok(m[3],m[2],m[1]):ok(m[3],m[1],m[2]);
+  if((m=s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{2,4})$/))&&MON[m[2].toLowerCase()])return ok(m[3],MON[m[2].toLowerCase()],m[1]);
+  if((m=s.match(/^([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/))&&MON[m[1].toLowerCase()])return ok(m[3],MON[m[1].toLowerCase()],m[2]);
+  return null;
+}
+function parseNum(s){
+  if(s==null)return null;s=String(s).trim();if(!s)return null;
+  if(!/^\(?[-+]?\s*[$€£]?\s*[-+]?[\d,]*\.?\d+\s*\)?\s*(CR|DR)?-?$/i.test(s))return null;
+  let neg=/^\(.*\)$/.test(s)||/-$/.test(s)||/^[-]/.test(s.replace(/[$€£\s(]/g,""))||/CR$/i.test(s);
+  const v=parseFloat(s.replace(/[^0-9.]/g,""));if(isNaN(v))return null;
+  return neg?-v:v;
+}
+function importRows(rows,source){
+  if(rows.length<2)return {txs:[],error:"This file has no transaction rows."};
+  const looksDate=c=>parseDate(c,false)||parseDate(c,true);
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,12);i++){
+    const r=rows[i];
+    if(!r.some(looksDate)&&r.filter(c=>/date|desc|amount|debit|credit|payee|merchant|withdraw|deposit|memo|details|cad/i.test(c)).length>=2){hi=i;break;}
+  }
+  const body=rows.slice(hi+1),ncol=Math.max(...body.map(r=>r.length));
+  let cDate=-1,cDesc=[],cAmt=-1,cDeb=-1,cCred=-1,cBal=-1;const bals=[];
+  if(hi>=0){
+    const h=rows[hi].map(x=>x.toLowerCase());
+    cDate=h.findIndex(x=>/trans.*date/.test(x));if(cDate<0)cDate=h.findIndex(x=>/date/.test(x));
+    h.forEach((x,i)=>{if(/desc|payee|merchant|memo|details|narrat|^name$/.test(x))cDesc.push(i);});
+    cDeb=h.findIndex(x=>/debit|withdraw|money out|paid out/.test(x)&&!/card/.test(x));
+    cCred=h.findIndex(x=>/credit|deposit|money in|paid in/.test(x)&&!/card|limit/.test(x));
+    cAmt=h.findIndex(x=>/amount|amt|^cad/.test(x));cBal=h.findIndex(x=>/balance/.test(x));
+    if(cDeb>=0&&cCred>=0&&cDeb!==cCred)cAmt=-1;else{cDeb=cCred=-1;}
+  }
+  if(cDate<0||(!cDesc.length)||(cAmt<0&&cDeb<0)){
+    const st=[];
+    for(let c=0;c<ncol;c++){
+      let dates=0,nums=0,filled=0,len=0;
+      for(const r of body){const v=r[c]||"";if(!v)continue;filled++;if(looksDate(v))dates++;else if(parseNum(v)!==null&&!/^\d{7,}$/.test(v))nums++;else len+=v.length;}
+      st.push({c,dates,nums,filled,len});
+    }
+    if(cDate<0){const d=st.find(s=>s.filled&&s.dates/s.filled>=.8);cDate=d?d.c:-1;}
+    const numCols=st.filter(s=>s.c!==cDate&&s.filled>=body.length*.15&&s.nums/s.filled>=.95);
+    if(!cDesc.length){const t=st.filter(s=>s.c!==cDate&&!numCols.includes(s)).sort((a,b)=>b.len-a.len)[0];if(t&&t.len)cDesc=[t.c];}
+    if(cAmt<0&&cDeb<0){
+      if(numCols.length>=2){
+        const a=numCols[0].c,b=numCols[1].c;
+        const both=body.filter(r=>(r[a]||"")!==""&&(r[b]||"")!==""&&parseNum(r[a])!==0&&parseNum(r[b])!==0).length;
+        if(both<body.length*.1){cDeb=a;cCred=b;if(numCols[2])cBal=numCols[2].c;}else{cAmt=a;cBal=b;}
+      }else if(numCols.length===1)cAmt=numCols[0].c;
+    }
+  }
+  if(cDate<0||(cAmt<0&&cDeb<0))return {txs:[],error:"Could not find a date column and an amount column in this file."};
+  let dayFirst=false;
+  for(const r of body){const m=(r[cDate]||"").match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.]\d{2,4}$/);if(m){if(+m[1]>12){dayFirst=true;break;}if(+m[2]>12)break;}}
+  const raw=[];
+  for(const r of body){
+    const d=parseDate(r[cDate],dayFirst);if(!d)continue;if(cBal>=0){const bv=parseNum(r[cBal]);if(bv!==null)bals.push({d,bv});}
+    const t=(cDesc.length?cDesc.map(i=>r[i]||"").filter(Boolean).join(" "):"Transaction").replace(/\s+/g," ").trim()||"Transaction";
+    let a;
+    if(cDeb>=0){const de=parseNum(r[cDeb]),cr=parseNum(r[cCred]);if(de===null&&cr===null)continue;a=Math.abs(de||0)-Math.abs(cr||0);}
+    else{a=parseNum(r[cAmt]);if(a===null)continue;}
+    if(a===0)continue;
+    raw.push({d,t,a:Math.round(a*100)/100,s:source});
+  }
+  if(cDeb<0){const neg=raw.filter(x=>x.a<0).length;if(neg>raw.length/2)raw.forEach(x=>x.a=-x.a);}
+  if(!raw.length)return {txs:[],error:"No rows with both a date and an amount were found."};
+  let bal=null,balDate=null;if(bals.length){const mx=bals.reduce((a,x)=>x.d>a?x.d:a,"");const c=bals.filter(x=>x.d===mx);const pick=bals[0].d>=bals[bals.length-1].d&&bals[0].d!==bals[bals.length-1].d?c[0]:c[c.length-1];bal=pick.bv;balDate=mx;}
+  return {txs:raw,bal,balDate};
+}
+
+/* ---- Leak analysis. Amounts: positive = money out ---- */
+const FEE=/\b(FEE|FEES|INTEREST|NSF|OVERDRAFT|OVERLIMIT|SERVICE CHARGE|SVC CHG|INT CHARGE|CASH ADVANCE)\b/i;
+const XFER=/\b(PAYMENT|PYMT|PMT|TRANSFER|TFR|XFER|E-?TRANSFER|ETRF|THANK YOU|BILL PAY)\b/i;
+function merchant(t){
+  let s=t.toUpperCase().replace(/\b(SQ|TST|PAYPAL|PP)\s*\*/g," ");
+  s=s.replace(/\b(POS|PURCHASE|INTERAC|VISA DEBIT|DEBIT CARD|PREAUTHORIZED|PRE-AUTHORIZED|RECURRING|CONTACTLESS|IDP|OPOS)\b/g," ");
+  s=s.replace(/[#*]\s*\w*\d\w*/g," ").replace(/\d+/g," ").replace(/[^A-Z&' ]/g," ").replace(/\s+/g," ").trim();
+  return s.split(" ").slice(0,3).join(" ")||t.toUpperCase().slice(0,24);
+}
+const nice=k=>k.toLowerCase().replace(/(^|[\s&'])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+const median=a=>{const s=[...a].sort((x,y)=>x-y),n=s.length;return n?(n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2):0;};
+function analyse(txs){
+  const out=txs.filter(x=>x.a>0).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  const R={count:txs.length,first:null,last:null,months:1,spend:0,transfers:0,byMonth:[],fees:{total:0,perMonth:0,items:[]},recurring:[],habits:[],dups:[],top:[]};
+  if(!txs.length)return R;
+  const ds=txs.map(x=>x.d).sort();R.first=ds[0];R.last=ds[ds.length-1];
+  R.months=Math.max(1,(diffDays(R.first,R.last)+1)/30.44);
+  const bm={},groups={},feeG={};
+  for(const x of out){
+    if(FEE.test(x.t)){R.fees.total+=x.a;const k=merchant(x.t);(feeG[k]=feeG[k]||{name:nice(k),total:0,count:0});feeG[k].total+=x.a;feeG[k].count++;R.spend+=x.a;bm[x.d.slice(0,7)]=(bm[x.d.slice(0,7)]||0)+x.a;continue;}
+    if(XFER.test(x.t)){R.transfers++;continue;}
+    R.spend+=x.a;bm[x.d.slice(0,7)]=(bm[x.d.slice(0,7)]||0)+x.a;
+    const k=merchant(x.t);(groups[k]=groups[k]||[]).push(x);
+  }
+  R.byMonth=Object.keys(bm).sort().map(m=>({month:m,total:bm[m]}));
+  R.fees.items=Object.values(feeG).sort((a,b)=>b.total-a.total);
+  R.fees.perMonth=R.fees.total/R.months;
+  for(const k in groups){
+    const g=groups[k],n=g.length,amts=g.map(x=>x.a),med=median(amts),total=amts.reduce((a,b)=>a+b,0);
+    R.top.push({key:k,name:nice(k),total,count:n});
+    const months=new Set(g.map(x=>x.d.slice(0,7))).size;
+    const [y1,m1]=g[0].d.split("-").map(Number),[y2,m2]=g[n-1].d.split("-").map(Number);
+    const span=(y2*12+m2)-(y1*12+m1)+1;
+    const similar=amts.filter(a=>Math.abs(a-med)<=med*.15).length/n;
+    const isRec=months>=2&&similar>=.6&&n/months<=1.6;
+    const isHabit=!isRec&&n/R.months>=4&&med<30;
+    if(isRec){
+      const first=g[0].a,last=g[n-1].a;
+      R.recurring.push({key:k,name:nice(k),monthly:med*n/span,annual:med*n/span*12,count:n,last:g[n-1].d,lastAmt:last,creep:(last>first*1.03&&last-first>=.5)?{from:first,to:last}:null});
+    }else if(isHabit)R.habits.push({key:k,name:nice(k),perMonth:total/R.months,count:n,avg:total/n});
+    if(!isHabit)for(let i=1;i<n;i++)if(g[i].a===g[i-1].a&&g[i].a>=5&&diffDays(g[i-1].d,g[i].d)<=1&&!(isRec))R.dups.push({name:nice(k),amt:g[i].a,d1:g[i-1].d,d2:g[i].d});
+  }
+  R.recurring.sort((a,b)=>b.monthly-a.monthly);R.habits.sort((a,b)=>b.perMonth-a.perMonth);
+  R.top.sort((a,b)=>b.total-a.total);R.top=R.top.slice(0,8);
+  return R;
+}
+
+function checks(plan,t,proj){
+  const c=[];const cushion=Number(plan.cushion)||0;
+  if(plan.incomes.length||plan.bills.length){
+    if(proj.low.bal<0)c.push({level:"crit",label:"Shortfall",title:"Your bill-paying cash goes below zero",detail:"lowLine"});
+    else if(proj.low.bal<cushion)c.push({level:"warn",label:"Tight",title:"Your cash dips under your cushion",detail:"lowLine"});
+    else c.push({level:"good",label:"Clear",title:"Cash stays above your cushion for 90 days",detail:"lowLine"});
+    if(t.income>0||t.bills>0)c.push(t.surplus<0?{level:"crit",label:"Gap",title:"Planned bills are higher than planned income",detail:"surplus"}:{level:t.surplus<t.income*.1?"warn":"good",label:t.surplus<t.income*.1?"Thin":"Room",title:"Left over each month after planned bills",detail:"surplus"});
+  }
+  if(t.bills>0&&t.cash>=0){const m=t.cash/t.bills;c.push({level:m<1?"crit":m<3?"warn":"good",label:m<1?"Low":m<3?"Building":"Solid",title:"Cash covers "+m.toFixed(1)+" months of planned bills",detail:"buffer"});}
+  if(t.cardLimit>0){const u=t.cardBal/t.cardLimit*100;c.push({level:u>50?"crit":u>30?"warn":"good",label:Math.round(u)+"% used",title:"Cards and lines of credit in use",detail:"util"});}
+  if(t.interest>0)c.push({level:"info",label:"Interest",title:"Borrowing costs you each month",detail:"interest"});
+  return c;
+}
+
+G.WL={TYPES,FREQ,PER_MONTH,iso,toD,addDays,addMonths,diffDays,occurrences,totals,project,parseCSV,parseDate,parseNum,importRows,merchant,analyse,checks,nice};
+})(typeof window!=="undefined"?window:globalThis);
+</script>
+<script>
+/* ---------- Pure logic 2: categories, detection, monthly recap ---------- */
+(function(G){
+"use strict";
+const L=G.WL;
+const FEE=/\b(FEE|FEES|INTEREST|NSF|OVERDRAFT|OVERLIMIT|SERVICE CHARGE|SVC CHG|INT CHARGE|CASH ADVANCE)\b/;
+const XFER=/\b(PAYMENT|PYMT|PMT|TRANSFER|TFR|XFER|E-?TRANSFER|ETRF|THANK YOU|BILL PAY)\b/;
+const RULES=[
+ ["housing",/MORTGAGE|\bRENT\b|CONDO FEE|STRATA|PROPERTY TAX|\bHOA\b/],
+ ["debt",/\bLOAN\b|LINE OF CREDIT|\bLOC\b|STUDENT|FINANCING|AUTO FINANCE/],
+ ["savings",/TFSA|RRSP|FHSA|RESP|WEALTHSIMPLE|QUESTRADE|INVEST|SAVINGS/],
+ ["bills",/HYDRO|ENBRIDGE|FORTIS|EPCOR|ENMAX|ATCO|UTILIT|ROGERS|\bBELL\b|TELUS|FIDO|KOODO|FREEDOM MOBILE|VIDEOTRON|\bSHAW\b|INTERNET|INSURANCE|INTACT|AVIVA|MANULIFE|SUN LIFE|\bWATER\b/],
+ ["transport",/PETRO|\bSHELL\b|\bESSO\b|HUSKY|ULTRAMAR|CHEVRON|FUEL|GAS BAR|UBER(?! ?EATS)|\bLYFT\b|PRESTO|TRANSIT|\bTTC\b|PARKING|IMPARK|407 ETR|CAR WASH|\bAUTO\b/],
+ ["fun",/NETFLIX|SPOTIFY|DISNEY|CRAVE|PRIME VIDEO|APPLE\.COM|YOUTUBE|STREAM|\bGYM\b|FITNESS|TIM HORTONS|STARBUCKS|COFFEE|MCDONALD|RESTAURANT|PIZZA|SUSHI|\bBAR\b|\bPUB\b|GRILL|CAFE|UBER ?EATS|DOORDASH|SKIPTHE|SKIP THE|CINEPLEX|LCBO|\bSAQ\b|BEER|LIQUOR|STEAM|PLAYSTATION|XBOX|AIR CANADA|WESTJET|HOTEL|AIRBNB|STORAGE|SUBSCRIPTION|MEMBERSHIP/],
+ ["living",/LOBLAW|SOBEYS|\bMETRO\b|COSTCO|WALMART|NO FRILLS|SUPERSTORE|SAFEWAY|SAVE ON|FRESHCO|FOOD BASICS|FARM BOY|GROCER|MARKET|SHOPPERS|PHARMA|WHOLE FOODS|\bIGA\b|CO-?OP|DOLLARAMA|CANADIAN TIRE|HOME DEPOT|HARDWARE|IKEA/]
+];
+function catOf(x,map){
+  const k=L.merchant(x.t);if(map&&map[k])return map[k];
+  const T=x.t.toUpperCase();
+  if(x.a<0)return XFER.test(T)?"transfer":"income";
+  if(FEE.test(T))return "fees";
+  for(const r of RULES)if(r[1].test(T))return r[0];
+  return XFER.test(T)?"transfer":"other";
+}
+const txMonths=txs=>[...new Set(txs.map(x=>x.d.slice(0,7)))].sort();
+function spendFor(txs,map,ym){
+  const R={ym,cats:{},out:0,inc:0,saved:0,n:0,merch:[]},m={};
+  for(const x of txs){
+    if(x.d.slice(0,7)!==ym)continue;R.n++;
+    const c=catOf(x,map);
+    if(c==="transfer")continue;
+    if(c==="income"){R.inc+=-x.a;continue;}
+    if(x.a<=0)continue;
+    if(c==="savings"){R.saved+=x.a;continue;}
+    R.cats[c]=(R.cats[c]||0)+x.a;R.out+=x.a;
+    const k=L.merchant(x.t);(m[k]=m[k]||{key:k,name:L.nice(k),total:0,count:0,cat:c});m[k].total+=x.a;m[k].count++;
+  }
+  R.merch=Object.values(m).sort((a,b)=>b.total-a.total);
+  return R;
+}
+const median=a=>{const s=[...a].sort((x,y)=>x-y),n=s.length;return n?(n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2):0;};
+function cadence(dates){
+  const u=[...new Set(dates)].sort();if(u.length<2)return null;
+  const gaps=[];for(let i=1;i<u.length;i++)gaps.push(L.diffDays(u[i-1],u[i]));
+  const g=median(gaps);
+  return g>=6&&g<=8?"weekly":g>=13&&g<=14.5?"biweekly":g>14.5&&g<=17?"semimonthly":g>=26&&g<=33?"monthly":g>=85&&g<=95?"quarterly":null;
+}
+function nextAfter(last,freq,today){
+  let d=last;
+  for(let i=0;i<200&&d<today;i++)d=freq==="weekly"?L.addDays(d,7):freq==="biweekly"?L.addDays(d,14):freq==="semimonthly"?L.addDays(d,15):freq==="quarterly"?L.addMonths(d,3):L.addMonths(d,1);
+  return d;
+}
+function detect(txs,map,today){
+  const gi={},go={},R={incomes:[],bills:[],everyday:null};
+  if(!txs.length)return R;
+  for(const x of txs){const c=catOf(x,map);if(c==="transfer"||c==="fees")continue;const k=L.merchant(x.t);if(c==="income")(gi[k]=gi[k]||[]).push(x);else if(x.a>0)(go[k]=go[k]||[]).push(Object.assign({c},x));}
+  const pick=(g,minAmt)=>{
+    g.sort((a,b)=>a.d<b.d?-1:1);const amts=g.map(x=>Math.abs(x.a)),med=median(amts);
+    if(g.length<2||med<minAmt)return null;
+    if(amts.filter(a=>Math.abs(a-med)<=med*.15).length/g.length<.6)return null;
+    const freq=cadence(g.map(x=>x.d));if(!freq)return null;
+    const last=g[g.length-1];
+    return {amt:Math.round(Math.abs(last.a)*100)/100,freq,next:nextAfter(last.d,freq,today),last:last.d,count:g.length};
+  };
+  for(const k in gi){const p=pick(gi[k],200);if(p)R.incomes.push(Object.assign({key:"in:"+k,name:L.nice(k)},p));}
+  const fixed=new Set();
+  for(const k in go){const p=pick(go[k],3);if(p){fixed.add(k);R.bills.push(Object.assign({key:"out:"+k,name:L.nice(k),cat:go[k][0].c},p));}}
+  R.incomes.sort((a,b)=>b.amt-a.amt);R.bills.sort((a,b)=>b.amt-a.amt);
+  const ds=txs.map(x=>x.d).sort(),span=L.diffDays(ds[0],ds[ds.length-1])+1;
+  if(span>=21){let v=0;for(const k in go)if(!fixed.has(k))for(const x of go[k])if(x.c==="living"||x.c==="fun"||x.c==="transport"||x.c==="other")v+=x.a;
+    const wk=v/(span/7);if(wk>=20)R.everyday={key:"everyday",name:"Everyday spending",amt:Math.round(wk/5)*5,freq:"weekly",next:L.addDays(today,1),cat:"living"};}
+  return R;
+}
+function recap(txs,map,today){
+  const first=today.slice(0,8)+"01",m1=L.addMonths(first,-1).slice(0,7),m0=L.addMonths(first,-2).slice(0,7);
+  return {m1,m0,a:spendFor(txs,map,m1),b:spendFor(txs,map,m0)};
+}
+Object.assign(L,{catOf,txMonths,spendFor,detect,recap,cadence});
+})(typeof window!=="undefined"?window:globalThis);
+</script>
+<script>
+/* ---------- Lessons ---------- */
+window.LESSONS=[
+{id:"net-worth",topic:"Basics",title:"Net worth: your financial scoreboard",
+ body:["Net worth is everything you own minus everything you owe. A home, savings and investments sit on one side. A mortgage, loans and card balances sit on the other.","It can be negative, especially early on or right after buying a home with a large mortgage. What matters most is the direction it moves over months and years."],
+ ex:"Own $600,000, owe $430,000. Net worth is $170,000. Pay $500 off a loan and it rises by $500 even though your bank balance fell.",
+ yours:(t,m)=>t.own||t.owe?`Yours is ${m(t.net)}: ${m(t.own)} owned minus ${m(t.owe)} owed.`:null,
+ quiz:{q:"You use $1,000 of savings to pay down a credit card. What happens to your net worth right away?",opts:["It drops by $1,000","It stays the same","It rises by $1,000"],a:1,why:"Savings fall by $1,000 and debt falls by $1,000, so the total is unchanged. The benefit comes later, as less interest."},
+ look:["net worth statement","assets vs liabilities"]},
+{id:"cash-flow",topic:"Basics",title:"Cash flow: timing is everything",
+ body:["Cash flow is money moving in and out over time. You can earn more than you spend across a month and still run short in the second week if the big bills land before payday.","That is why this app shows a day-by-day forecast as well as monthly totals. Totals tell you whether the plan works. Timing tells you whether it works every day."],
+ ex:"Pay arrives on the 15th and 30th. Rent of $2,000 is due on the 1st. You need $2,000 sitting there on the 1st, no matter how healthy the monthly total looks.",
+ yours:(t,m,p)=>p.events.length?`Your lowest point in the next 90 days is ${m(p.low.bal)}.`:null,
+ quiz:{q:"Your income is higher than your spending this month. Can you still overdraw your account?",opts:["No, the month balances","Yes, if bills land before the income does"],a:1,why:"A monthly surplus says nothing about the order things happen in. A cushion in the account covers the gaps."},
+ look:["personal cash flow statement","cash flow vs profit"]},
+{id:"gross-net",topic:"Basics",title:"Gross pay and take-home pay",
+ body:["Gross pay is the headline number before anything is taken off. Take-home (net) pay is what lands in your account after tax, pension and benefit deductions.","Plan with take-home pay, because that is the money you can actually direct. A raise also arrives smaller than it sounds, since deductions take their share of it first."],
+ ex:"A $90,000 salary might land as roughly $2,600 every two weeks rather than $3,460. The exact figure depends on where you live and your deductions.",
+ quiz:{q:"Which number should a spending plan be built on?",opts:["Gross salary","Take-home pay"],a:1,why:"You can only spend or save what actually arrives."},
+ look:["how to read a pay stub","marginal vs average tax rate"]},
+{id:"liquidity",topic:"Basics",title:"Liquidity: how fast can it become cash?",
+ body:["Liquid money can be spent today without losing value: chequing and savings. A home is valuable but illiquid, because turning it into cash takes months and costs fees.","Being wealthy on paper and short of cash at the same time is common. That is why an emergency fund is kept liquid even though it earns less."],
+ ex:"$50,000 of home equity cannot pay a $900 car repair this week. $900 in savings can.",
+ yours:(t,m)=>t.own?`${m(t.cash)} of the ${m(t.own)} you own is in cash accounts.`:null,
+ quiz:{q:"Which is the most liquid?",opts:["A savings account","A house","A retirement account with withdrawal penalties"],a:0,why:"Savings can be moved and spent almost immediately with no loss."},
+ look:["liquid vs illiquid assets","house rich cash poor"]},
+{id:"pay-yourself-first",topic:"Saving",title:"Pay yourself first",
+ body:["Most people save whatever is left at the end of the month, and often nothing is. Paying yourself first flips the order: a set amount moves to savings on payday, and you spend what remains.","Automating the transfer matters more than the size of it. A small amount that happens every payday beats a large amount that depends on willpower."],
+ ex:"$100 moved every two weeks is $2,600 a year without a single decision after the first one.",
+ widget:["sinking",{amt:2600,label:"Yearly savings target"}],
+ quiz:{q:"What makes pay-yourself-first work?",opts:["Saving a large amount","Saving before you spend, automatically","Checking your balance daily"],a:1,why:"The order and the automation do the work. The amount can start small and grow."},
+ look:["automatic savings transfer","reverse budgeting"]},
+{id:"emergency-fund",topic:"Saving",title:"The emergency fund",
+ body:["An emergency fund is cash set aside for the things that are certain to happen at uncertain times: a repair, a gap between jobs, a vet bill. Its job is to keep a surprise from becoming debt.","A common target is three to six months of essential costs. Getting to one month first removes most of the day-to-day stress."],
+ ex:"Essentials of $4,000 a month means a starter goal of $4,000 and a fuller goal of $12,000 to $24,000.",
+ yours:(t,m)=>t.bills>0?`Your cash covers about ${(t.cash/t.bills).toFixed(1)} months of your planned bills.`:null,
+ quiz:{q:"Where does an emergency fund belong?",opts:["In stocks, for growth","Somewhere safe and quick to reach","Locked in a five-year deposit"],a:1,why:"It has to be there, at full value, on the day you need it."},
+ look:["emergency fund how much","high interest savings account"]},
+{id:"sinking-funds",topic:"Saving",title:"Sinking funds for bills you can see coming",
+ body:["Some costs are predictable but irregular: insurance renewals, property tax, holidays, car maintenance. They feel like emergencies only because they arrive in one lump.","A sinking fund spreads them out. Divide the yearly cost by your number of paydays and set that aside each time."],
+ ex:"$1,800 of car insurance once a year is $150 a month, or about $69 per biweekly payday.",
+ widget:["sinking",{amt:1800,label:"Yearly cost"}],
+ quiz:{q:"A $1,200 annual bill needs how much set aside each month?",opts:["$50","$100","$120"],a:1,why:"$1,200 divided by 12 months is $100."},
+ look:["sinking funds examples","irregular expenses budget"]},
+{id:"savings-rate",topic:"Saving",title:"Savings rate: the number you control",
+ body:["Your savings rate is the share of take-home pay you keep. Investment returns are out of your hands, but this number is not, and early on it matters far more than returns do.","Raising it by even a few points compounds, because every dollar saved is also a dollar you have learned to live without."],
+ ex:"Keeping $600 of a $6,000 monthly income is a 10% savings rate.",
+ yours:(t,m)=>t.income>0?`Right now your plan leaves ${m(t.surplus)} of ${m(t.income)}, which is ${Math.round(t.surplus/t.income*100)}%.`:null,
+ quiz:{q:"Income $5,000, saving $750. What is the savings rate?",opts:["7.5%","15%","20%"],a:1,why:"750 divided by 5,000 is 0.15, or 15%."},
+ look:["savings rate calculator","how much should I save"]},
+{id:"budget-503020",topic:"Cash flow",title:"The 50/30/20 guide",
+ body:["A popular starting point splits take-home pay three ways: about 50% for needs, 30% for wants and 20% for saving and extra debt repayment.","It is a yardstick, not a law. In expensive cities needs often run higher. Its real use is showing which of the three buckets is squeezing the others."],
+ ex:"On $6,000 a month: $3,000 needs, $1,800 wants, $1,200 saving.",
+ yours:(t,m)=>t.income>0?`On your income of ${m(t.income)} that would be ${m(t.income*.5)}, ${m(t.income*.3)} and ${m(t.income*.2)}. The Flow tab shows your actual split.`:null,
+ quiz:{q:"In 50/30/20, what is the 20 for?",opts:["Housing","Fun","Saving and extra debt repayment"],a:2,why:"The 20% is the part that builds your future: savings, investing and paying debt down faster."},
+ look:["50 30 20 budget","zero based budget"]},
+{id:"fixed-variable",topic:"Cash flow",title:"Fixed and variable costs",
+ body:["Fixed costs are the same every month: mortgage, insurance, loan payments. Variable costs move with your choices: groceries, fuel, eating out.","Fixed costs are hard to change quickly but each change is permanent. Variable costs are easy to trim but drift back. The biggest lasting wins usually come from renegotiating one fixed cost."],
+ ex:"Cutting a $90 phone plan to $55 saves $420 a year with one phone call and no ongoing effort.",
+ quiz:{q:"Which is a fixed cost?",opts:["Groceries","A car loan payment","Restaurant meals"],a:1,why:"The loan payment is the same amount on the same day each month."},
+ look:["fixed vs variable expenses","how to negotiate bills"]},
+{id:"lifestyle-creep",topic:"Cash flow",title:"Lifestyle creep",
+ body:["When income rises, spending tends to rise to meet it, one reasonable upgrade at a time. A year later the raise has vanished and nothing feels different.","The counter is to decide in advance: when a raise arrives, send a fixed share of it to savings before it reaches your everyday account."],
+ ex:"A $300 a month raise with half saved still gives you $150 more to enjoy, and adds $1,800 a year to savings.",
+ quiz:{q:"What is the simplest defence against lifestyle creep?",opts:["Refusing raises","Saving a set share of each raise automatically","Tracking every coffee"],a:1,why:"Deciding once, ahead of time, beats resisting every small upgrade."},
+ look:["lifestyle inflation","hedonic adaptation"]},
+{id:"subscriptions",topic:"Cash flow",title:"The subscription audit",
+ body:["Small recurring charges are easy to sign up for and easy to forget. Each one is minor, and together they can match a utility bill.","Twice a year, list every repeating charge and ask one question of each: would I sign up for this again today at this price?"],
+ ex:"Six services averaging $14 a month is about $1,000 a year.",
+ yours:()=>"The statement check under Flow builds this list for you from a bank or card statement.",
+ quiz:{q:"A $12 a month subscription costs how much over five years?",opts:["$144","$360","$720"],a:2,why:"$12 times 12 months times 5 years is $720."},
+ look:["subscription audit","cancel unused subscriptions"]},
+{id:"apr",topic:"Debt",title:"How credit card interest works",
+ body:["A card's annual rate (APR) is charged on what you carry past the due date. Pay the full statement balance and most cards charge no interest on purchases at all. That window is called the grace period.","Carry any balance and interest is worked out daily on the whole amount, usually including new purchases. That is why a card is cheap as a payment tool and expensive as a loan."],
+ ex:"$3,000 carried at 20% costs about $50 a month in interest before you have paid off a single dollar.",
+ yours:(t,m)=>t.topRate?`Your highest rate is ${t.topRate.rate}% on ${t.topRate.name}, costing roughly ${m(t.topRate.monthly)} a month.`:null,
+ widget:["payoff",{bal:3000,apr:20,pay:150}],
+ quiz:{q:"How do you avoid interest on card purchases?",opts:["Pay the minimum on time","Pay the full statement balance by the due date","Keep the balance under the limit"],a:1,why:"Paying the full statement balance keeps the grace period, so purchases cost nothing extra."},
+ look:["credit card grace period","how is credit card interest calculated"]},
+{id:"minimum-payment",topic:"Debt",title:"The minimum payment trap",
+ body:["The minimum payment is set to keep the account in good standing, not to clear the debt. Most of it goes to interest, so the balance barely moves.","Adding even a modest fixed amount on top changes the picture sharply, because every extra dollar goes straight at the balance."],
+ ex:"$3,000 at 20% paid at $75 a month takes about five and a half years and close to $2,000 in interest. At $150 a month it takes under two years.",
+ widget:["payoff",{bal:3000,apr:20,pay:75}],
+ quiz:{q:"Why does paying only the minimum take so long?",opts:["Most of the payment covers interest","Banks delay processing","The balance is frozen"],a:0,why:"After interest is covered, very little is left to reduce what you owe."},
+ look:["minimum payment calculator","credit card payoff"]},
+{id:"avalanche-snowball",topic:"Debt",title:"Avalanche and snowball",
+ body:["Two well-known ways to clear several debts. Avalanche: pay minimums on everything, then put every extra dollar on the highest interest rate. It costs the least overall.","Snowball: put the extra on the smallest balance first. It costs a little more, but closing an account quickly keeps many people going. The best method is the one you will stick with."],
+ ex:"Card at 20%, line of credit at 8%, car loan at 7%. Avalanche order is card, line, car.",
+ yours:(t,m)=>t.topRate?`By avalanche, your first target would be ${t.topRate.name} at ${t.topRate.rate}%.`:null,
+ quiz:{q:"Which method pays the least interest overall?",opts:["Snowball","Avalanche","They are identical"],a:1,why:"Attacking the highest rate first removes the most expensive debt soonest."},
+ look:["debt avalanche vs snowball","debt payoff planner"]},
+{id:"utilization",topic:"Debt",title:"Credit utilization",
+ body:["Utilization is the share of your available revolving credit that is in use. Credit scoring models read high utilization as a sign of strain, even if every payment is on time.","Under about 30% is the figure most often quoted, and lower is better. Paying down a balance improves it quickly, since it is measured fresh each month."],
+ ex:"$2,000 owed on a $5,000 limit is 40%. Paying it to $1,400 brings it to 28%.",
+ yours:(t,m)=>t.cardLimit>0?`Yours is ${Math.round(t.cardBal/t.cardLimit*100)}%: ${m(t.cardBal)} of ${m(t.cardLimit)}.`:null,
+ quiz:{q:"$1,500 owed across cards with $10,000 of total limit. Utilization is:",opts:["1.5%","15%","30%"],a:1,why:"1,500 divided by 10,000 is 15%."},
+ look:["credit utilization ratio","what affects credit score"]},
+{id:"amortization",topic:"Debt",title:"Why early mortgage payments are mostly interest",
+ body:["A mortgage payment stays level, but its makeup changes. Interest is charged on what you still owe, so early on, when the balance is largest, most of each payment is interest.","This is why extra payments in the early years are so powerful: they cut the balance that every future interest charge is based on."],
+ ex:"On $400,000 at 5% over 25 years, the payment is about $2,340. In month one, roughly $1,670 of that is interest and $670 reduces the loan.",
+ widget:["mortgage",{bal:400000,rate:5,yrs:25,extra:200}],
+ quiz:{q:"When does an extra mortgage payment save the most interest?",opts:["Early in the mortgage","In the final years","Timing makes no difference"],a:0,why:"An early extra payment removes balance that would otherwise have charged interest for decades."},
+ look:["amortization schedule","mortgage prepayment privileges"]},
+{id:"debt-return",topic:"Debt",title:"Paying off debt is a guaranteed return",
+ body:["Every dollar that clears a 20% card saves you 20% a year in interest, with no risk and no tax on the gain. Very few investments can promise that.","A useful way to compare: line up each debt's rate against what you could reasonably expect to earn elsewhere. Debts above that line usually come first."],
+ ex:"$1,000 off a 20% card saves about $200 a year. $1,000 in a 4% savings account earns about $40.",
+ quiz:{q:"Which is usually the better use of a spare $1,000?",opts:["Savings at 4% while carrying a 20% card","Paying down the 20% card"],a:1,why:"Saving 20% beats earning 4%. Keep a small emergency cushion first so a surprise does not go back on the card."},
+ look:["pay off debt or invest","interest rate arbitrage personal finance"]},
+{id:"compound",topic:"Investing",title:"Compound growth",
+ body:["Compounding means earning returns on your earlier returns as well as on what you put in. Growth is slow at first and then speeds up, which is why time matters more than timing.","The same force works against you on debt, where unpaid interest gets charged interest."],
+ ex:"$200 a month at 6% for 30 years grows to about $200,000. Only $72,000 of that is money you put in.",
+ widget:["compound",{start:0,add:200,rate:6,yrs:30}],
+ quiz:{q:"What has the biggest effect on compound growth?",opts:["Picking the perfect day to start","The number of years it has to run","Checking it often"],a:1,why:"Each extra year lets the whole pile grow again, including all the growth so far."},
+ look:["compound interest explained","compound interest calculator"]},
+{id:"rule-72",topic:"Investing",title:"The rule of 72",
+ body:["A quick way to estimate how long money takes to double: divide 72 by the yearly growth rate. It works well for rates between about 4% and 12%.","It works for costs too. Divide 72 by a debt's rate to see how fast it would double if left alone, or by inflation to see how fast prices double."],
+ ex:"At 6%, money doubles in about 12 years. At 3% inflation, prices double in about 24.",
+ widget:["rule72",{rate:6}],
+ quiz:{q:"At 8% a year, money doubles in roughly:",opts:["6 years","9 years","12 years"],a:1,why:"72 divided by 8 is 9."},
+ look:["rule of 72","doubling time"]},
+{id:"diversification",topic:"Investing",title:"Diversification",
+ body:["Spreading money across many companies, industries and countries means no single failure can sink you. The bad news at one firm is offset by ordinary results at hundreds of others.","It does not remove the risk of markets falling as a whole. It removes the risk you were never being paid to take: betting everything on one name."],
+ ex:"One stock can go to zero. A fund holding 3,000 companies would need all of them to fail.",
+ quiz:{q:"What does diversification protect against?",opts:["All losses","A single company or sector collapsing","Inflation"],a:1,why:"It handles company-specific risk. Whole-market drops still affect a diversified portfolio."},
+ look:["diversification investing","asset allocation basics"]},
+{id:"index-fees",topic:"Investing",title:"Index funds and the cost of fees",
+ body:["An index fund simply holds every company in a market index rather than paying managers to pick winners. Because it is cheap to run, its yearly fee can be a fraction of a percent.","Fees come out every year whether markets rise or fall, and they compound just like returns. A difference that looks tiny becomes very large over decades."],
+ ex:"$50,000 for 25 years at 6% before fees: a 2% fee leaves about $133,000, a 0.2% fee about $205,000.",
+ widget:["fees",{amt:50000,yrs:25,ret:6,feeA:2,feeB:.2}],
+ quiz:{q:"Why do small fee differences matter so much?",opts:["They are charged once at the start","They compound every year","They only apply in bad years"],a:1,why:"A yearly fee reduces the base that all future growth builds on."},
+ look:["index fund vs mutual fund","management expense ratio"]},
+{id:"risk-horizon",topic:"Investing",title:"Risk and time horizon",
+ body:["Investments that can grow more also swing more in the short run. The question is not how much risk you can stomach in the abstract, but when you need the money.","Money needed within a few years belongs somewhere stable. Money for decades away has time to ride out bad stretches."],
+ ex:"A down payment needed in 18 months sits in savings. Retirement money 25 years out can be invested for growth.",
+ quiz:{q:"You need $20,000 for a purchase next year. Where does it most sensibly sit?",opts:["Somewhere stable, like savings","Entirely in stocks","In a single promising company"],a:0,why:"With a short horizon there is no time to recover from a market drop."},
+ look:["investment time horizon","risk tolerance vs risk capacity"]},
+{id:"dca",topic:"Investing",title:"Investing a little at a time",
+ body:["Putting in a fixed amount on a regular schedule is called dollar-cost averaging. When prices are low your amount buys more, and when they are high it buys less.","It does not guarantee a gain. Its real strength is that it removes the question of when to invest, which is the question that stops most people from starting."],
+ ex:"$250 on every payday goes in whether the news is good or bad.",
+ quiz:{q:"The main benefit of investing a fixed amount regularly is:",opts:["Guaranteed profit","A steady habit without trying to time the market","Avoiding all fees"],a:1,why:"It builds consistency and takes the timing decision away."},
+ look:["dollar cost averaging","lump sum vs dollar cost averaging"]},
+{id:"tax-shelter",topic:"Investing",title:"Tax-sheltered accounts",
+ body:["Many countries offer accounts where investment growth is taxed lightly or not at all. They are wrappers: the same investments can sit inside, but more of the growth stays yours.","Examples include the TFSA, RRSP and FHSA in Canada, the 401(k), IRA and Roth IRA in the United States, and ISAs and pensions in the UK. Each has its own limits and withdrawal rules, so check the official source for yours."],
+ ex:"An employer that matches part of your pension contribution is giving you an instant return before any investing happens.",
+ quiz:{q:"A tax-sheltered account is best described as:",opts:["A type of investment","A container that changes how investments inside are taxed","A guaranteed savings rate"],a:1,why:"The account is the wrapper. What you hold inside it is a separate choice."},
+ look:["registered accounts your country","employer pension matching"]},
+{id:"inflation",topic:"Big picture",title:"Inflation",
+ body:["Inflation is the general rise in prices over time. The dollars stay the same but each one buys a little less each year.","Money sitting idle loses buying power quietly. This is the main reason long-term savings are invested rather than left in cash."],
+ ex:"At 3% inflation, $100 buys in 20 years what about $55 buys today.",
+ widget:["inflation",{amt:100,rate:3,yrs:20}],
+ quiz:{q:"Your savings earn 2% while prices rise 3%. Your buying power:",opts:["Grows 2%","Shrinks about 1%","Stays the same"],a:1,why:"The gap between what you earn and inflation is your real return, here about minus 1%."},
+ look:["inflation purchasing power","real vs nominal return"]},
+{id:"opportunity-cost",topic:"Big picture",title:"Opportunity cost",
+ body:["Every dollar can only be used once. The true cost of anything is the next best thing that dollar could have done.","This is not an argument against spending. It is a way to check that a purchase is worth more to you than the alternative."],
+ ex:"A $600 a month car payment versus a $350 one is $3,000 a year that could clear a card or fill an emergency fund.",
+ quiz:{q:"The opportunity cost of a $2,000 holiday is:",opts:["$2,000","Whatever else that $2,000 would have done for you","Nothing, if paid in cash"],a:1,why:"The cost is the best alternative you gave up."},
+ look:["opportunity cost examples","time value of money"]}
+];
+/* ---------- Canadian tax and account lessons. Figures checked November 2026. ---------- */
+(function(){
+const T="Canada: tax and accounts",NOTE=" Limits change, so confirm the current figure on canada.ca.";
+const CA=[
+{id:"ca-tfsa",topic:T,title:"TFSA: tax-free growth you can take back out",
+ body:["A Tax-Free Savings Account is a wrapper, not a savings product. You put in money that has already been taxed, and everything it earns inside, whether interest, dividends or gains, is never taxed, including when you take it out.","Room builds every year from age 18 whether or not you use it. Withdrawals are added back to your room on January 1 of the following year, which makes the TFSA flexible enough for both long-term investing and nearer goals."],
+ ex:"The 2026 limit is $7,000. Someone eligible every year since 2009 who has never contributed has $109,000 of room."+NOTE,
+ quiz:{q:"You withdraw $5,000 from your TFSA in June. When can you put it back without using other room?",opts:["Right away","January 1 of next year","Never"],a:1,why:"Withdrawn amounts are added back to your room at the start of the following calendar year. Re-contributing sooner can count as an over-contribution if you have no other room."},
+ look:["TFSA contribution room CRA","TFSA vs savings account"]},
+{id:"ca-rrsp",topic:T,title:"RRSP: a tax deduction now, tax later",
+ body:["Money you put into a Registered Retirement Savings Plan is deducted from your income, so you get back tax at your marginal rate. It then grows untaxed until you withdraw, when it is taxed as ordinary income.","The idea is to deduct in high-earning years and withdraw in lower-income years such as retirement. New room each year is 18% of the previous year's earned income up to a yearly cap, less any pension adjustment, and unused room carries forward."],
+ ex:"The cap for 2026 is $33,810. Contributions made in the first 60 days of a year can be deducted on the previous year's return; for the 2026 tax year that deadline is March 1, 2027."+NOTE,
+ quiz:{q:"When is an RRSP deduction worth the most?",opts:["In a low-income year","In a high-income year","It is always worth the same"],a:1,why:"The deduction saves tax at your marginal rate, so it is worth more when your income, and therefore your rate, is higher. You can contribute now and claim the deduction in a later year."},
+ look:["RRSP deduction limit","Notice of Assessment RRSP room"]},
+{id:"ca-fhsa",topic:T,title:"FHSA: the first-home account",
+ body:["The First Home Savings Account combines the best of the other two: contributions are deductible like an RRSP, and a withdrawal to buy a qualifying first home is tax-free like a TFSA.","Room only starts once you open the account, and at most one year of unused room carries forward. The account has a 15-year life. If it is not used for a home, the money can generally move to an RRSP without using RRSP room."],
+ ex:"$8,000 of room a year, $40,000 for life, and up to $8,000 of unused room carried into the next year."+NOTE,
+ quiz:{q:"When does FHSA contribution room start building?",opts:["At age 18","When you open the account","When you buy a home"],a:1,why:"Unlike the TFSA, room does not accumulate before the account exists."},
+ look:["FHSA qualifying withdrawal","FHSA transfer to RRSP"]},
+{id:"ca-rrsp-tfsa",topic:T,title:"RRSP or TFSA first?",
+ body:["Both shelter growth. The difference is when the tax is paid. The TFSA taxes the money before it goes in and never again. The RRSP gives tax back now and collects it on the way out.","If your tax rate will be lower when you withdraw than it is today, the RRSP comes out ahead. If it will be the same, they tie. If it will be higher, or you may need the money before retirement, the TFSA usually wins."],
+ ex:"Deduct at a 43% marginal rate today and withdraw at 30% in retirement, and the RRSP has kept 13 cents of every dollar from tax.",
+ quiz:{q:"What mainly decides RRSP versus TFSA?",opts:["Which bank offers it","Your tax rate now compared with when you withdraw","The investments inside"],a:1,why:"The same investments can sit in either account. The outcome differs only through the tax rate at contribution versus withdrawal."},
+ look:["RRSP vs TFSA marginal tax rate","RRSP refund reinvest"]},
+{id:"ca-marginal",topic:T,title:"Marginal tax rate",
+ body:["Canada taxes income in layers called brackets. Each layer has its own rate, and a higher rate applies only to the dollars inside that layer. A raise can never reduce your take-home pay overall.","Your marginal rate is the rate on your next dollar, federal and provincial combined. It is the number that matters for decisions, because it is what a deduction saves you and what extra income costs you."],
+ ex:"At a 40% marginal rate, a $1,000 RRSP contribution returns about $400 at tax time, and $1,000 of extra interest income costs about $400.",
+ quiz:{q:"A raise moves you into a higher tax bracket. What happens?",opts:["All your income is taxed at the higher rate","Only the income above the threshold is taxed at the higher rate"],a:1,why:"Brackets apply layer by layer. Income below the threshold is taxed exactly as before."},
+ look:["Canada tax brackets by province","marginal vs average tax rate Canada"]},
+{id:"ca-invest-income",topic:T,title:"Not all investment income is taxed alike",
+ body:["Outside registered accounts, the type of income matters. Interest is taxed in full at your marginal rate. Only half of a capital gain is included in income. Dividends from Canadian companies come with a tax credit that lowers the tax on them.","This is why people often hold interest-paying investments inside registered accounts first, and why a gain is only taxed when you sell."],
+ ex:"A $10,000 capital gain adds $5,000 to taxable income. $10,000 of interest adds all $10,000."+NOTE,
+ quiz:{q:"In a taxable account, which is taxed most heavily per dollar?",opts:["Interest","Capital gains","Eligible Canadian dividends"],a:0,why:"Interest is fully taxable. Capital gains are half included, and Canadian dividends receive a tax credit."},
+ look:["capital gains inclusion rate Canada","dividend tax credit","asset location"]},
+{id:"ca-room",topic:T,title:"Knowing your contribution room",
+ body:["Your RRSP room is printed on your Notice of Assessment each year, and both RRSP and TFSA room are shown in your CRA online account. The TFSA figure there can lag, because institutions report the previous year's activity early in the new year.","Going over your room is costly. Excess TFSA contributions are charged 1% per month until removed, so keep your own running record across every institution you use."],
+ ex:"$3,000 over your TFSA room for four months costs $120, and the excess still has to come out.",
+ quiz:{q:"Who is responsible for tracking TFSA room across several banks?",opts:["Each bank","The CRA in real time","You"],a:2,why:"Each bank sees only its own account, and CRA's figure is not live. Your own record is the safeguard."},
+ look:["CRA My Account TFSA room","TFSA over-contribution penalty"]},
+{id:"ca-hbp",topic:T,title:"The Home Buyers' Plan",
+ body:["The Home Buyers' Plan lets a first-time buyer take money out of an RRSP for a home without paying tax on the withdrawal. It is a loan from your own retirement savings.","The amount must be repaid to the RRSP over a set schedule of up to 15 years. Any year's missed repayment is added to that year's taxable income. It can be combined with an FHSA withdrawal for the same purchase."],
+ ex:"The withdrawal limit is $60,000 per person, so a couple who both qualify could use up to $120,000."+NOTE,
+ quiz:{q:"What happens if you skip a required HBP repayment?",opts:["Nothing","That year's amount is added to your taxable income","The whole withdrawal becomes taxable"],a:1,why:"Only the missed instalment for that year is taxed as income."},
+ look:["Home Buyers' Plan repayment","HBP and FHSA together"]},
+{id:"ca-spousal",topic:T,title:"Spousal RRSP",
+ body:["With a spousal RRSP, one partner contributes and takes the deduction, and the other partner owns the account and pays the tax on withdrawals. It uses the contributor's own RRSP room.","The purpose is to even out retirement incomes so that two people each pay tax in lower brackets, rather than one person paying in a high one. Money withdrawn within about three years of a contribution is taxed back to the contributor."],
+ ex:"The higher earner deducts at 43% today. In retirement the lower-income spouse withdraws at perhaps 25%.",
+ quiz:{q:"Who claims the deduction for a spousal RRSP contribution?",opts:["The spouse who owns the account","The spouse who contributed"],a:1,why:"The contributor deducts it against their own income and uses their own room."},
+ look:["spousal RRSP attribution rule","pension income splitting"]},
+{id:"ca-property",topic:T,title:"Homes, rentals and tax",
+ body:["When you sell the home you live in, the principal residence exemption generally makes the gain tax-free. A family can designate only one property per year. A property you rent out is different: rent minus eligible expenses is added to your income each year, and a gain on sale is a taxable capital gain.","Timing matters too. Profit on a residential property sold after being owned for less than 365 days is generally treated as fully taxable business income rather than a capital gain, with exceptions for certain life events."],
+ ex:"Expenses commonly deducted against rent include mortgage interest, property tax, insurance, condo fees and repairs. Property rules are detailed, so speak to an accountant before selling or renting.",
+ quiz:{q:"Which sale is generally tax-free?",opts:["A rental condo","The home you have lived in as your principal residence","A property sold after six months"],a:1,why:"The principal residence exemption covers the home you ordinarily live in, for the years it is designated."},
+ look:["principal residence exemption","rental income CRA T776","residential property flipping rule"]},
+{id:"ca-match",topic:T,title:"Employer matching",
+ body:["Many employers add money to a group RRSP, pension or share plan when you contribute. A 50% match means every dollar you put in is immediately worth $1.50, before any investment growth.","It is usually the first place for savings to go, ahead of other investing. Check your plan for the match rate, the cap, and any vesting period before the employer's share is fully yours."],
+ ex:"Contribute 4% of an $80,000 salary with a full match and $3,200 becomes $6,400 a year.",
+ quiz:{q:"Your employer matches contributions up to 4% of pay and you put in 2%. What are you giving up?",opts:["Nothing","Half of the available match","Your tax deduction"],a:1,why:"The employer would match another 2% of pay that you are not contributing."},
+ look:["group RRSP matching","DPSP vesting","pension adjustment"]}
+];
+/* Interleave so Canadian lessons come up often */
+const base=window.LESSONS,out=[];let i=0,j=0;
+while(i<base.length||j<CA.length){if(j<CA.length)out.push(CA[j++]);if(i<base.length)out.push(base[i++]);if(i<base.length)out.push(base[i++]);}
+window.LESSONS=out;
+})();
+</script>
+<script>
+/* ---------- App ---------- */
+(function(){
+"use strict";
+const L=window.WL,LESSONS=window.LESSONS,$=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nf0=new Intl.NumberFormat("en-CA",{maximumFractionDigits:0}),nf2=new Intl.NumberFormat("en-CA",{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=v=>(v<0?"−":"")+"$"+nf0.format(Math.abs(Math.round(v)));
+const money2=v=>(v<0?"−":"")+"$"+nf2.format(Math.abs(v));
+const dfmt=(s,o)=>L.toD(s).toLocaleDateString("en-CA",Object.assign({month:"short",day:"numeric",timeZone:"UTC"},o||{}));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const now=new Date(),TODAY=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+const num=v=>{const n=parseFloat(String(v).replace(/[^0-9.\-]/g,""));return isNaN(n)?0:n;};
+const pct=(a,b)=>b>0?Math.round(a/b*100):0;
+const CATS={
+  housing:{label:"Housing",hint:"Mortgage or rent, condo fees, property tax",group:"needs"},
+  debt:{label:"Debt payments",hint:"Card, line of credit and loan payments",group:"needs"},
+  living:{label:"Food and everyday",hint:"Groceries, household, personal",group:"needs"},
+  bills:{label:"Utilities, phone, insurance",hint:"The regular services",group:"needs"},
+  transport:{label:"Transport",hint:"Fuel, transit, parking, maintenance",group:"needs"},
+  savings:{label:"Savings and investing",hint:"Transfers you make to yourself",group:"saving"},
+  fun:{label:"Fun and subscriptions",hint:"Eating out, streaming, hobbies, travel",group:"wants"},
+  other:{label:"Other",hint:"Anything that does not fit",group:"needs"}
+};
+const guessCat=n=>{n=n.toLowerCase();
+  if(/mortgage|rent|condo|strata|property tax|hoa/.test(n))return "housing";
+  if(/saving|invest|tfsa|rrsp|401|ira|emergency fund/.test(n))return "savings";
+  if(/loan|card|credit|line of|loc\b|debt/.test(n))return "debt";
+  if(/grocer|food|everyday|household/.test(n))return "living";
+  if(/hydro|electric|gas bill|water|utilit|phone|internet|mobile|insur/.test(n))return "bills";
+  if(/fuel|gas|transit|parking|car\b|uber/.test(n))return "transport";
+  if(/netflix|spotify|stream|gym|subscription|dining|restaurant|fun|travel/.test(n))return "fun";
+  return "other";};
+const emptyPlan=()=>({v:2,accounts:[],incomes:[],bills:[],goals:[],cushion:500,efMonths:3,marks:{},history:{},backup:null,catMap:{},seen:{}});
+const LS="waterline-v2",LSL="waterline-learn";
+let plan=emptyPlan(),txs=[],sample=true,showAll=false,importNote=null,flowSeg="month",canSave=true,whatIf=null,lessonId=null;
+let learn={done:{},streak:0,last:null,today:null};
+
+/* ---- Example data ---- */
+function makeSample(){
+  const p=emptyPlan();const A=(name,type,bal,x)=>p.accounts.push(Object.assign({id:uid(),name,type,bal,updated:TODAY},x||{}));
+  A("Everyday chequing","chequing",4200,{payFrom:true});A("Rainy day savings","savings",6500);
+  A("Investment account","invest",38000,{reg:"TFSA"});A("Home","property",560000);
+  A("Rewards credit card","card",2850,{rate:20.99,limit:8000});A("Line of credit","loc",9400,{rate:8.2,limit:20000});
+  A("Mortgage","mortgage",412000,{rate:4.6});A("Car loan","loan",14300,{rate:6.9});
+  const dow=L.toD(TODAY).getUTCDay(),fri=L.addDays(TODAY,((5-dow)+7)%7||7);
+  p.incomes.push({id:uid(),name:"Paycheque",amt:2950,freq:"biweekly",date:fri});
+  const dom=d=>{const c=TODAY.slice(0,8)+String(d).padStart(2,"0");return c>=TODAY?c:L.addMonths(c,1);};
+  const B=(name,amt,freq,date,cat)=>p.bills.push({id:uid(),name,amt,freq,date,cat});
+  B("Mortgage payment",2480,"monthly",dom(1),"housing");B("Phone and internet",165,"monthly",dom(8),"bills");B("Home and car insurance",190,"monthly",dom(12),"bills");
+  B("Car loan payment",410,"monthly",dom(15),"debt");B("Utilities",240,"monthly",dom(20),"bills");B("Credit card payment",600,"monthly",dom(25),"debt");
+  B("Line of credit payment",250,"monthly",dom(28),"debt");B("Groceries and everyday spending",230,"weekly",L.addDays(TODAY,2),"living");
+  B("Fuel",140,"monthly",dom(18),"transport");B("Streaming, gym and eating out",260,"monthly",dom(5),"fun");
+  p.goals.push({id:uid(),name:"Holiday fund",target:3000,saved:900,date:L.addMonths(TODAY,8)});
+  const t=[];let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const add=(d,n,a)=>{if(d<=TODAY)t.push({d,t:n,a,s:"Example statement"});};
+  for(let m=3;m>=0;m--){
+    const base=L.addMonths(TODAY.slice(0,8)+"01",-m);
+    add(L.addDays(base,2),"STREAMLINE TV SUBSCRIPTION",m>=2?16.99:18.99);add(L.addDays(base,4),"IRONWORKS GYM MEMBERSHIP",54);
+    add(L.addDays(base,9),"CLOUDBOX STORAGE",3.99);add(L.addDays(base,0),"MONTHLY ACCOUNT FEE",16.95);add(L.addDays(base,20),"PURCHASE INTEREST",44+Math.round(rnd()*900)/100);
+    for(let i=0;i<12;i++)add(L.addDays(base,Math.floor(rnd()*28)),"DAILY GRIND COFFEE #"+(100+Math.floor(rnd()*3)),Math.round((4+rnd()*3.5)*100)/100);
+    for(let i=0;i<4;i++)add(L.addDays(base,3+i*7),"FRESHMART GROCERY 0"+(i+1),Math.round((95+rnd()*90)*100)/100);
+    for(let i=0;i<2;i++)add(L.addDays(base,6+i*13),"PETRO STOP FUEL",Math.round((58+rnd()*25)*100)/100);
+    if(m===1){add(L.addDays(base,11),"CORNER HARDWARE",42.1);add(L.addDays(base,11),"CORNER HARDWARE",42.1);}
+    add(L.addDays(base,24),"PAYMENT THANK YOU",-600);add(base,"MORTGAGE PAYMENT",2480);
+  }
+  for(let k=1;k<=9;k++)add(L.addDays(fri,-14*k),"PAYROLL DEPOSIT ACME WIND",-2950);
+  return {p,t};
+}
+function loadSample(){const s=makeSample();plan=s.p;txs=s.t;sample=true;}
+function leaveSample(){if(!sample)return;plan=emptyPlan();txs=[];sample=false;importNote=null;whatIf=null;}
+
+/* ---- Storage: this device only ---- */
+function setStatus(){
+  $("#status").textContent=sample?"Example numbers. Nothing is saved yet.":canSave?"Stored only on this device. Nothing is sent anywhere.":"This browser is not letting the page save. Use Export backup under Accounts before you close it.";
+}
+function load(){
+  try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.parse(raw);plan=Object.assign(emptyPlan(),o.plan);txs=o.txs||[];sample=false;}}catch(e){canSave=false;}
+  try{const raw=localStorage.getItem(LSL);if(raw)learn=Object.assign(learn,JSON.parse(raw));}catch(e){}
+}
+function save(){
+  if(sample)return;
+  if(plan.accounts.length){const t=L.totals(plan);plan.history[TODAY.slice(0,7)]={own:Math.round(t.own),owe:Math.round(t.owe)};}
+  try{localStorage.setItem(LS,JSON.stringify({plan,txs}));canSave=true;}catch(e){canSave=false;}
+  setStatus();
+}
+function saveLearn(){try{localStorage.setItem(LSL,JSON.stringify(learn));}catch(e){}}
+
+/* ---- Shared bits ---- */
+const pill=(level,label)=>{const ic={good:"✓",warn:"!",crit:"✕",info:"i"}[level];return `<span class="pill ${level}"><span aria-hidden="true">${ic}</span>${esc(label)}</span>`;};
+const why=(html,label)=>`<details class="why"><summary>${label||"What does this mean?"}</summary><div>${html}</div></details>`;
+function flowCats(t){
+  const cats={};let out=0;
+  for(const b of plan.bills){const k=CATS[b.cat]?b.cat:"other",m=(Number(b.amt)||0)*(L.PER_MONTH[b.freq]||0);if(!m)continue;(cats[k]=cats[k]||{total:0,items:[]});cats[k].total+=m;cats[k].items.push({name:b.name,m,freq:b.freq,amt:b.amt});out+=m;}
+  const g={needs:0,wants:0,saving:0};for(const k in cats)g[CATS[k].group]+=cats[k].total;
+  const left=t.income-out;if(left>0)g.saving+=left;
+  return {cats,out,left,g};
+}
+function stackbar(f,t){
+  const base=Math.max(t.income,f.out,1);
+  return `<div class="stackbar" role="img" aria-label="Share of monthly income by category">${Object.keys(CATS).filter(k=>f.cats[k]).map(k=>`<i style="width:${f.cats[k].total/base*100}%;background:var(--c-${k})" title="${esc(CATS[k].label)}: ${money(f.cats[k].total)}"></i>`).join("")}</div>`;
+}
+const CHECK_WHY={
+ lowLine:"This follows your bill-paying account day by day, adding each payday and subtracting each bill on its date. The lowest point is the day you come closest to running out. Keeping it above your cushion means a surprise or an early bill will not overdraw you. Open Flow, then Next 90 days, to see which day it is and why.",
+ surplus:"Every payday and bill is converted to a monthly amount. A pay every two weeks counts as 26 pays a year divided by 12. What is left is money you can direct to savings or to paying debt faster. Spending that is not in your bills list also comes out of this, so an honest weekly estimate for everyday spending makes it accurate.",
+ buffer:"This compares the cash in your chequing and savings with one month of planned bills. It answers a simple question: if your income stopped today, how long could you keep going? One month takes away most day-to-day stress. Three to six months is the usual longer-term goal.",
+ util:"Utilization is how much of your available credit on cards and lines of credit you are using. Credit scoring looks at it closely. High utilization also means little room left for a real emergency. It is measured fresh each month, so paying a balance down improves it quickly.",
+ interest:"Each debt's balance multiplied by its yearly rate, divided by 12. It is an estimate of what borrowing costs in a typical month, money that buys nothing. It falls as balances fall, and fastest when extra payments go to the highest rate first."
+};
+function checkDetail(c,t,proj){
+  const cushion=Number(plan.cushion)||0;
+  if(c.detail==="lowLine")return `Lowest point is ${money(proj.low.bal)} on ${dfmt(proj.low.date)}. Your cushion is ${money(cushion)}.`;
+  if(c.detail==="surplus")return `About ${money(t.income)} in and ${money(t.bills)} out each month leaves ${money(t.surplus)}.`;
+  if(c.detail==="buffer")return `${money(t.cash)} in chequing and savings against ${money(t.bills)} of planned bills a month.`;
+  if(c.detail==="util")return `${money(t.cardBal)} owed of ${money(t.cardLimit)} available. Under 30% is the figure most often quoted.`;
+  if(c.detail==="interest")return `Roughly ${money(t.interest)} a month at today's balances and rates.`+(t.topRate?` The most expensive is ${esc(t.topRate.name)} at ${t.topRate.rate}%, about ${money(t.topRate.monthly)} a month.`:"");
+  return "";
+}
+
+/* ---- Render ---- */
+function render(){
+  $("#banner").innerHTML=sample?`<div class="banner"><p><strong>These are example numbers</strong> so you can see how it works. Nothing here is yours yet.</p><button class="btn primary" data-act="start">Use my own numbers</button></div>`:"";
+  setStatus();
+  const t=L.totals(plan),proj=L.project(plan,TODAY,90),f=flowCats(t);
+  renderHome(t,proj,f);renderFlow(t,proj,f);renderSave(t,proj,f);renderLearn(t,proj);renderAccounts(t);
+  route();
+}
+function todaysLesson(){
+  if(!learn.today||learn.today.date!==TODAY||!LESSONS.find(x=>x.id===learn.today.id)){
+    const open=LESSONS.filter(x=>!learn.done[x.id]),pool=open.length?open:LESSONS,day=Math.floor(L.toD(TODAY).getTime()/86400000);
+    learn.today={date:TODAY,id:pool[day%pool.length].id};saveLearn();
+  }
+  return LESSONS.find(x=>x.id===learn.today.id);
+}
+/* ---- Home ---- */
+const SPEND=Object.assign({},CATS,{fees:{label:"Fees and interest"}});
+function untilPayday(proj){
+  const next=plan.incomes.map(i=>L.occurrences(i,L.addDays(TODAY,1),L.addDays(TODAY,62))[0]).filter(Boolean).sort()[0];
+  if(!next)return null;
+  const due=proj.events.filter(e=>e.kind==="out"&&e.date<next);
+  return {next,due,sum:due.reduce((a,e)=>a-e.amt,0),low:Math.min(proj.start,...proj.daily.filter(d=>d.date<next).map(d=>d.bal)),days:L.diffDays(TODAY,next)};
+}
+function suggestions(){
+  const D=L.detect(txs,plan.catMap,TODAY),seen=plan.seen||{},out=[];
+  const near=(a,b)=>Math.abs(a-b)<=Math.max(1,b*.03);
+  for(const i of D.incomes)if(!seen[i.key]&&!plan.incomes.some(x=>near(x.amt,i.amt)))out.push(Object.assign({kind:"income"},i));
+  for(const b of D.bills)if(!seen[b.key]&&!plan.bills.some(x=>near(x.amt,b.amt)&&x.freq===b.freq))out.push(Object.assign({kind:"bill"},b));
+  if(D.everyday&&!seen.everyday&&!plan.bills.some(x=>x.cat==="living"&&(x.freq==="weekly"||x.freq==="biweekly")))out.push(Object.assign({kind:"bill"},D.everyday));
+  return out;
+}
+function actions(t,proj,f){
+  const A=[],cushion=Number(plan.cushion)||0,R=L.analyse(txs),marks=plan.marks||{},S=suggestions();
+  const add=(title,detail,label,go,seg)=>A.push({title,detail,label,go:go||"",seg:seg||""});
+  if(!plan.accounts.length)add("Add your accounts","Start with chequing, then cards and loans.","Go to Accounts","accounts");
+  if(proj.low.bal<0)add(`Cover a ${money(-proj.low.bal)} shortfall on ${dfmt(proj.low.date)}`,"Your bill account is forecast to go below zero. Moving money in beforehand, or shifting a due date, avoids fees.","See the day","flow","days");
+  else if(plan.bills.length&&proj.low.bal<cushion)add(`Top up before ${dfmt(proj.low.date)}`,`Your account dips to ${money(proj.low.bal)}, under your ${money(cushion)} cushion.`,"See the day","flow","days");
+  if(S.length)add(`Confirm ${S.length} regular item${S.length>1?"s":""} found in your statements`,"Adding them completes your forecast and monthly picture without typing.","Review","flow","check");
+  if(t.income>0&&f.left<0)add("Close the monthly gap of "+money(-f.left),"Planned bills are higher than income. Start with the largest category.","See where it goes","flow","month");
+  const stale=plan.accounts.filter(a=>a.updated&&L.diffDays(a.updated,TODAY)>35).length;
+  if(stale)add(`Update ${stale} balance${stale>1?"s":""}`,"They were last changed over a month ago, so the picture is drifting.","Update balances","","balances");
+  const r=L.recap(txs,plan.catMap,TODAY);
+  if(plan.accounts.length&&!r.a.n)add("Import last month's statement","It takes a minute and fills in how the month went.","Import","flow","check");
+  if(t.topRate&&t.topRate.rate>=15)add(`Extra payments save the most on ${t.topRate.name}`,`At ${t.topRate.rate}% it costs about ${money(t.topRate.monthly)} a month, your most expensive debt.`,"Why this works","learn","avalanche-snowball");
+  const und=R.recurring.filter(x=>!marks[x.key]);
+  if(und.length)add(`Review ${und.length} repeating charge${und.length>1?"s":""}`,`Together about ${money(und.reduce((a,x)=>a+x.annual,0))} a year. Keep or cut each one.`,"Review","flow","check");
+  if(R.fees.total>0)add("Ask your bank about fees",`About ${money(R.fees.perMonth*12)} a year in fees and interest charges at the current pace.`,"See them","flow","check");
+  if(f.left>50&&!plan.bills.some(b=>b.cat==="savings"))add(`Give your ${money(f.left)} left over a job`,"Test an automatic transfer on payday and see whether it fits.","Try an amount","save");
+  return A;
+}
+function spark(){
+  const ks=Object.keys(plan.history||{}).sort();
+  if(ks.length<2)return `<p class="small muted">A trend line appears here once you have updated balances in a second month.</p>`;
+  const v=ks.map(k=>plan.history[k].own-plan.history[k].owe),mn=Math.min(...v),mx=Math.max(...v),W=300,H=56;
+  const x=i=>6+i/(v.length-1)*(W-12),y=n=>mx===mn?H/2:6+(mx-n)/(mx-mn)*(H-12);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Net worth from ${ks[0]} to ${ks[ks.length-1]}"><polyline points="${v.map((n,i)=>x(i)+","+y(n)).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/><circle cx="${x(v.length-1)}" cy="${y(v[v.length-1])}" r="4" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/></svg><p class="small muted num">${ks[0]} ${money(v[0])} to ${ks[ks.length-1]} ${money(v[v.length-1])}</p>`;
+}
+function typeBars(t){
+  const rows=Object.keys(L.TYPES).filter(k=>t.byType[k]>0).map(k=>({v:t.byType[k],side:L.TYPES[k].side,label:L.TYPES[k].label}));
+  if(!rows.length)return "";const max=Math.max(...rows.map(r=>r.v));
+  return `<div class="row small muted" style="justify-content:flex-start;gap:14px"><span><span class="dot" style="background:var(--accent)"></span> You own</span><span><span class="dot" style="background:var(--c-debt)"></span> You owe</span></div><div class="bars">`+rows.map(r=>`<div class="bar-row" title="${esc(r.label)}: ${money(r.v)}"><span>${esc(r.label)}</span><div class="bar-track"><div class="bar-fill ${r.side==="owe"?"owe":""}" style="width:${Math.max(1,r.v/max*100)}%"></div></div><span class="num">${money(r.v)}</span></div>`).join("")+`</div>`;
+}
+const monthName=(m,o)=>dfmt(m+"-01",Object.assign({day:undefined,month:"long"},o||{}));
+function lastMonthCard(){
+  const r=L.recap(txs,plan.catMap,TODAY),a=r.a,b=r.b,name=monthName(r.m1);
+  if(!a.n)return `<div class="card"><div class="stack"><h2>Last month</h2><p class="muted">Import your ${name} statement and this card shows what came in, what went out and how it compares with the month before.</p><div><button class="btn" data-act="go" data-go="flow" data-seg="check">Import a statement</button></div></div></div>`;
+  const diff=b.n?a.out-b.out:null,top=Object.keys(a.cats).sort((x,y)=>a.cats[y]-a.cats[x]).slice(0,3);
+  const h=plan.history||{},nw=h[r.m1]&&h[r.m0]?(h[r.m1].own-h[r.m1].owe)-(h[r.m0].own-h[r.m0].owe):null;
+  return `<div class="card"><div class="stack"><h2>Last month, ${name}</h2>
+    <div class="trio num">${a.inc>0?`<div><div class="lab">Came in</div><div class="val">${money(a.inc)}</div></div>`:""}<div><div class="lab">Spent</div><div class="val">${money(a.out)}</div></div>${a.inc>0?`<div><div class="lab">Kept</div><div class="val" style="color:var(--${a.inc-a.out<0?"crit":"good"})">${money(a.inc-a.out)}</div></div>`:""}${a.saved>0?`<div><div class="lab">To savings</div><div class="val">${money(a.saved)}</div></div>`:""}</div>
+    <p class="num">${diff===null?`You spent ${money(a.out)} in ${name}.`:Math.abs(diff)<a.out*.03?`You spent ${money(a.out)}, about the same as ${monthName(r.m0)}.`:`You spent ${money(a.out)}, which is ${money(Math.abs(diff))} ${diff>0?"more":"less"} than ${monthName(r.m0)}.`}${nw!==null?` Your net worth ${nw>=0?"rose":"fell"} by ${money(Math.abs(nw))}.`:""}</p>
+    <ul class="list">${top.map(k=>{const d=b.n?a.cats[k]-(b.cats[k]||0):null;return `<li><div class="li-main" style="display:flex;gap:10px;align-items:center"><span class="dot" style="background:var(--c-${k})"></span><span>${SPEND[k].label}</span></div><div class="li-amt num">${money(a.cats[k])}${d!==null&&Math.abs(d)>=5?`<div class="s">${d>0?"up":"down"} ${money(Math.abs(d))}</div>`:""}</div></li>`;}).join("")}</ul>
+    <div><button class="btn small" data-act="go" data-go="flow" data-seg="check">See all of it</button></div>
+    ${why("These figures come from the statements you have imported. Transfers between your own accounts and card payments are left out so nothing is counted twice. If a card or account is missing from your imports, its spending is missing here too. Kept is what came in minus what was spent.")}
+  </div></div>`;
+}
+function renderHome(t,proj,f){
+  const el=$("#v-home"),l=todaysLesson();
+  const lesson=`<div class="card"><div class="stack"><div class="row"><span class="eyebrow">Today's lesson · ${esc(l.topic)}</span>${learn.streak>1?`<span class="chip">${learn.streak}-day streak</span>`:""}</div><h2 style="font-size:1.3rem">${esc(l.title)}</h2><p>${esc(l.body[0])}</p><div><a class="btn primary" href="#learn" data-act="open-today">Read the rest</a></div></div></div>`;
+  if(!sample&&!plan.accounts.length&&!plan.incomes.length&&!plan.bills.length&&!txs.length){
+    el.innerHTML=lesson+`<div class="card"><div class="stack"><h2>Three steps to your first picture</h2><p class="muted">About ten minutes. Rounded numbers are fine.</p>
+    <ol class="steps"><li><span>Add what you own and owe.</span><button class="btn primary" data-act="add-account">Add an account</button></li>
+    <li><span>Import a bank or card statement. It finds your pay and bills for you.</span><button class="btn" data-act="go" data-go="flow" data-seg="check">Import</button></li>
+    <li><span>Confirm what it found, and add anything it missed.</span><button class="btn" data-act="go" data-go="accounts">Accounts</button></li></ol></div></div>`;
+    return;
+  }
+  const order={crit:0,warn:1,info:2,good:3},cs=L.checks(plan,t,proj).sort((a,b)=>order[a.level]-order[b.level]);
+  const scored=cs.filter(c=>c.level!=="info"),good=scored.filter(c=>c.level==="good").length,up=untilPayday(proj),cushion=Number(plan.cushion)||0;
+  const acts=actions(t,proj,f).slice(0,3);
+  const debts=plan.accounts.filter(a=>L.TYPES[a.type]&&L.TYPES[a.type].side==="owe"&&a.bal>0).sort((a,b)=>(b.rate||0)-(a.rate||0));
+  el.innerHTML=lesson+`
+  <div class="card"><div class="stack"><div class="row"><h2>Your financial health</h2>${scored.length?`<span class="chip num">${good} of ${scored.length} healthy</span>`:""}</div>
+    ${up?`<div class="trio num"><div><div class="lab">In your account</div><div class="val">${money(proj.start)}</div></div><div><div class="lab">Due before payday</div><div class="val">${money(up.sum)}</div></div><div><div class="lab">Lowest it gets</div><div class="val" style="color:var(--${up.low<0?"crit":up.low<cushion?"warn":"good"})">${money(up.low)}</div></div></div>
+    <p class="num">${up.low<0?pill("crit","Short"):up.low<cushion?pill("warn","Tight"):pill("good","OK until payday")} Payday is ${dfmt(up.next,{weekday:"long"})}, ${up.days===1?"tomorrow":"in "+up.days+" days"}.${up.due.length?"":" Nothing is due before then."}</p>
+    ${up.due.length?`<details class="more"><summary><span>What is due before then</span></summary><div class="body"><ul class="list">${up.due.map(e=>`<li><div class="li-main"><div class="t">${esc(e.name)}</div><div class="s">${dfmt(e.date,{weekday:"short"})}</div></div><div class="li-amt num">${money(-e.amt)}</div></li>`).join("")}</ul></div></details>`:""}`:`<p class="muted">Add a payday to see whether you are covered until the next one.</p>`}
+    <div>${cs.map(c=>`<details class="more"><summary><span style="display:flex;gap:10px;align-items:flex-start;min-width:0">${pill(c.level,c.label)}<span>${esc(c.title)}</span></span></summary><div class="body"><p class="num">${checkDetail(c,t,proj)}</p><p class="muted">${CHECK_WHY[c.detail]}</p></div></details>`).join("")}</div>
+    <p class="small muted">Tap any line for the detail. These are common rules of thumb applied to your numbers, not personal financial advice.</p>
+  </div></div>
+  ${acts.length?`<div class="card"><div class="stack"><h2>What you could do next</h2><ul class="list">${acts.map(a=>`<li style="flex-wrap:wrap"><div class="li-main"><div class="t">${esc(a.title)}</div><div class="s num">${esc(a.detail)}</div></div><button class="btn small" data-act="go" data-go="${a.go}" data-seg="${a.seg}">${esc(a.label)}</button></li>`).join("")}</ul></div></div>`:""}
+  ${lastMonthCard()}
+  <div class="card"><div class="stack"><div class="row"><span class="eyebrow">Net worth</span>${sample||!plan.accounts.length?"":`<button class="btn small" data-act="balances">Update balances</button>`}</div><span class="big num">${money(t.net)}</span><span class="muted small num">${money(t.own)} owned, ${money(t.owe)} owed</span>${spark()}
+    <details class="more"><summary><span>Break it down</span></summary><div class="body">${typeBars(t)||"No accounts yet."}</div></details>
+    ${debts.length?`<details class="more"><summary><span>Your debts, most expensive first</span></summary><div class="body"><ul class="list">${debts.map(a=>`<li><div class="li-main"><div class="t">${esc(a.name)}</div><div class="s num">${a.rate?a.rate+"%":"No rate entered"}${a.limit?" · "+pct(a.bal,a.limit)+"% of limit":""}</div></div><div class="li-amt num"><div>${money(a.bal)}</div><div class="s">${a.rate?"about "+money(a.bal*a.rate/1200)+"/mo interest":""}</div></div></li>`).join("")}</ul><p class="muted">Extra dollars save the most interest at the top of this list.</p></div></details>`:""}
+    ${why("Net worth is everything you own minus everything you owe. It is the single best measure of whether you are getting ahead. It rises when you save, when you pay down debt, and when what you own grows in value. Update your balances once a month and the line above becomes your long-term scoreboard.")}
+  </div></div>`;
+}
+
+/* ---- Statement helpers ---- */
+let spMonth=null,pending=null;
+function suggestCard(){
+  const s=suggestions();if(!s.length)return "";
+  return `<div class="card"><div class="stack"><h2>Found in your statements</h2><p class="small muted">These look regular. Add the ones that are right and your forecast fills itself in.</p>
+  <ul class="list">${s.map(x=>`<li style="flex-wrap:wrap"><div class="li-main"><div class="t">${esc(x.name)}</div><div class="s num">${x.kind==="income"?"Looks like pay":(SPEND[x.cat]||SPEND.other).label} · ${L.FREQ[x.freq].toLowerCase()} · next about ${dfmt(x.next)}</div></div><div class="li-amt num">${money2(x.amt)}</div>${sample?"":`<div class="actions"><button class="btn small primary" data-act="sugg-add" data-key="${esc(x.key)}">Add</button><button class="btn small" data-act="sugg-skip" data-key="${esc(x.key)}">Not this</button></div>`}</li>`).join("")}</ul>
+  ${why("The app looks for money arriving or leaving at a steady rhythm for a similar amount: every week, every two weeks, twice a month or monthly. Deposits like that are probably pay, and charges like that are probably bills. Everyday spending is the weekly average of your groceries, fuel, eating out and other variable purchases. Nothing is added until you tap Add and confirm the details.","How these were found")}</div></div>`;
+}
+function spendCard(){
+  const ms=L.txMonths(txs);if(!ms.length)return "";
+  if(!spMonth||!ms.includes(spMonth)){const r=L.recap(txs,plan.catMap,TODAY);spMonth=ms.includes(r.m1)?r.m1:ms[ms.length-1];}
+  const S=L.spendFor(txs,plan.catMap,spMonth),keys=Object.keys(SPEND).filter(k=>S.cats[k]).sort((a,b)=>S.cats[b]-S.cats[a]),max=Math.max(1,...keys.map(k=>S.cats[k]));
+  const opts=Object.keys(SPEND).map(k=>[k,SPEND[k].label]).concat([["savings","Savings and investing"],["transfer","Not spending (transfer)"]]).filter((x,i,a)=>a.findIndex(y=>y[0]===x[0])===i);
+  return `<div class="card"><div class="stack"><div class="row"><h2>Where it went</h2><select id="sp-month" aria-label="Month" style="width:auto;min-height:36px;padding:5px 10px">${ms.slice().reverse().map(m=>`<option value="${m}" ${m===spMonth?"selected":""}>${monthName(m,{year:"numeric"})}</option>`).join("")}</select></div>
+    <p class="num">Spent <strong>${money(S.out)}</strong>${S.inc>0?` · came in ${money(S.inc)}`:""}${S.saved>0?` · moved to savings ${money(S.saved)}`:""}</p>
+    <div class="bars">${keys.map(k=>`<div class="bar-row" title="${SPEND[k].label}: ${money(S.cats[k])}"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span class="dot" style="background:var(--c-${k})"></span><span>${SPEND[k].label}</span></span><div class="bar-track"><div class="bar-fill" style="width:${S.cats[k]/max*100}%;background:var(--c-${k})"></div></div><span class="num">${money(S.cats[k])}</span></div>`).join("")||`<p class="muted">No spending found in this month.</p>`}</div>
+    ${S.merch.length?`<details class="more"><summary><span>By place, and fix a category</span></summary><div class="body"><ul class="list">${S.merch.slice(0,15).map(x=>`<li style="flex-wrap:wrap"><div class="li-main"><div class="t">${esc(x.name)}</div><div class="s num">${x.count} transaction${x.count>1?"s":""} · ${money(x.total)}</div></div><select class="set-cat" data-key="${esc(x.key)}" aria-label="Category for ${esc(x.name)}" ${sample?"disabled":""} style="width:auto;max-width:170px;min-height:36px;padding:5px 8px;font-size:.85rem">${opts.map(o=>`<option value="${o[0]}" ${o[0]===x.cat?"selected":""}>${o[1]}</option>`).join("")}</select></li>`).join("")}</ul></div></details>`:""}
+    ${why("Each transaction is sorted into a category by recognising words in its description, such as a grocery chain or a fuel brand. Anything it does not recognise lands in Other. Open By place to move a merchant to the right category. The app remembers your choice for every past and future transaction from that merchant.")}
+  </div></div>`;
+}
+async function handleFiles(files){
+  if(!files||!files.length)return;leaveSample();
+  const errs=[],items=[];
+  for(const file of files){
+    if(/\.pdf$/i.test(file.name)){errs.push(file.name+": PDF statements can't be read here. Download the CSV version instead.");continue;}
+    try{
+      const res=L.importRows(L.parseCSV(await file.text()),file.name.replace(/\.[^.]+$/,""));
+      if(res.error){errs.push(file.name+": "+res.error);continue;}
+      items.push({name:file.name.replace(/\.[^.]+$/,""),txs:res.txs,bal:res.bal,balDate:res.balDate});
+    }catch(e){errs.push(file.name+": this file could not be read.");}
+  }
+  pending={items,errs};
+  if(items.length&&plan.accounts.length)openLink();else commitImport({});
+}
+function commitImport(links){
+  const have=new Set(txs.map(x=>x.d+"|"+x.t+"|"+x.a));let added=0,skipped=0,upd=0;
+  pending.items.forEach((it,i)=>{
+    const lk=links[i]||{},acct=plan.accounts.find(a=>a.id===lk.acct);
+    for(const x of it.txs){x.t=x.t.slice(0,80);if(have.has(x.d+"|"+x.t+"|"+x.a)){skipped++;continue;}if(acct)x.s=acct.name;txs.push(x);added++;}
+    if(acct&&lk.setBal&&it.bal!=null){acct.bal=Math.abs(it.bal);acct.updated=TODAY;upd++;}
+  });
+  const errs=pending.errs;pending=null;
+  importNote={err:!added&&errs.length>0,text:(added?`Added ${added} transactions.`:"")+(skipped?` Skipped ${skipped} already loaded.`:"")+(upd?` Updated ${upd} balance${upd>1?"s":""}.`:"")+(errs.length?" "+errs.join(" "):"")};
+  flowSeg="check";spMonth=null;save();render();
+}
+function openLink(){
+  const dlg=$("#dlg");
+  dlg.innerHTML=`<form class="f" id="f" novalidate><h2 id="dlg-title">Which account is this?</h2><p class="small muted">Linking a statement to an account lets the app update that balance for you.</p>
+  ${pending.items.map((it,i)=>{const ds=it.txs.map(x=>x.d).sort();return `<label for="lk-${i}">${esc(it.name)} <span class="hint num">${it.txs.length} transactions, ${dfmt(ds[0])} to ${dfmt(ds[ds.length-1])}</span><select id="lk-${i}"><option value="">Not linked</option>${plan.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select></label>${it.bal!=null?`<label class="cb" for="lb-${i}"><input type="checkbox" id="lb-${i}" checked>Set its balance to ${money2(Math.abs(it.bal))}, from ${dfmt(it.balDate)}</label>`:""}`;}).join("")}
+  <div class="f-actions"><div></div><div class="actions"><button type="submit" class="btn primary">Import</button></div></div></form>`;
+  dlg.querySelector("#f").addEventListener("submit",e=>{e.preventDefault();const links={};pending.items.forEach((it,i)=>{const cb=document.getElementById("lb-"+i);links[i]={acct:document.getElementById("lk-"+i).value,setBal:cb?cb.checked:false};});dlg.close();commitImport(links);});
+  dlg.addEventListener("close",()=>{if(pending)commitImport({});},{once:true});
+  if(dlg.showModal)dlg.showModal();else dlg.setAttribute("open","");
+}
+function openBalances(){
+  const dlg=$("#dlg");
+  dlg.innerHTML=`<form class="f" id="f" novalidate><h2 id="dlg-title">Update balances</h2><p class="small muted">Open your banking app and copy today's numbers. Leave any that have not changed.</p>
+  ${plan.accounts.map((a,i)=>`<label for="ub-${i}">${esc(a.name)} <span class="hint">${L.TYPES[a.type].label}${a.updated?", last updated "+dfmt(a.updated):""}</span><input type="text" inputmode="decimal" id="ub-${i}" value="${esc(a.bal)}"></label>`).join("")}
+  <div class="f-actions"><div></div><div class="actions"><button type="button" class="btn" id="f-cancel">Cancel</button><button type="submit" class="btn primary">Save all</button></div></div></form>`;
+  dlg.querySelector("#f-cancel").addEventListener("click",()=>dlg.close());
+  dlg.querySelector("#f").addEventListener("submit",e=>{e.preventDefault();plan.accounts.forEach((a,i)=>{a.bal=Math.abs(num(document.getElementById("ub-"+i).value));a.updated=TODAY;});dlg.close();save();render();});
+  if(dlg.showModal)dlg.showModal();else dlg.setAttribute("open","");
+}
+
+/* ---- Flow ---- */
+let flowData=null;
+function renderFlow(t,proj,f){
+  const el=$("#v-flow");
+  const seg=`<div class="seg" role="group" aria-label="Flow view">${[["month","Monthly picture"],["days","Next 90 days"],["check","Spending and leaks"]].map(([k,l])=>`<button style="white-space:normal" data-act="seg" data-v="${k}" aria-pressed="${flowSeg===k}">${l}</button>`).join("")}</div>`;
+  el.innerHTML=seg+(flowSeg==="month"?flowMonth(t,f):flowSeg==="days"?flowDays(t,proj):flowCheck());
+  if(flowSeg==="days"){flowData={proj,cushion:Number(plan.cushion)||0};drawFlow();}
+  if(flowSeg==="check")bindUpload();
+}
+function flowMonth(t,f){
+  if(!plan.incomes.length&&!plan.bills.length)return `<div class="card"><div class="stack"><h2>Nothing to show yet</h2><p class="muted">Add a payday and your regular bills, and this page shows where each month's income goes.</p><div class="actions" style="justify-content:flex-start"><button class="btn primary" data-act="add-income">Add a payday</button><button class="btn" data-act="add-bill">Add a bill</button></div></div></div>`;
+  const keys=Object.keys(CATS).filter(k=>f.cats[k]);
+  const g=f.g,tot=Math.max(t.income,1);
+  const guide=[["needs","Needs",50,"Housing, debt payments, food, utilities, transport"],["wants","Wants",30,"Fun and subscriptions"],["saving","Saving",20,"Savings transfers plus what is left over"]];
+  return `
+  <div class="card"><div class="stack"><h2>Where a typical month goes</h2>
+    <p class="num">Out of ${money(t.income)} coming in, ${money(f.out)} is planned to go out${f.left>=0?" and "+money(f.left)+" is left over":""}.</p>
+    ${stackbar(f,t)}
+    <div>${keys.map(k=>`<details class="more"><summary><span style="display:flex;gap:10px;align-items:center;min-width:0"><span class="dot" style="background:var(--c-${k})"></span><span>${CATS[k].label}</span></span><span class="num" style="margin-left:auto;text-align:right">${money(f.cats[k].total)} <span class="muted small">${t.income>0?pct(f.cats[k].total,t.income)+"%":""}</span></span></summary><div class="body"><ul class="list">${f.cats[k].items.sort((a,b)=>b.m-a.m).map(i=>`<li><div class="li-main"><div class="t">${esc(i.name)}</div><div class="s num">${money(i.amt)} ${L.FREQ[i.freq].toLowerCase()}</div></div><div class="li-amt num">${money(i.m)}/mo</div></li>`).join("")}</ul></div></details>`).join("")}
+    <details class="more"><summary><span style="display:flex;gap:10px;align-items:center"><span class="dot" style="background:var(--fill);border:1px solid var(--line)"></span><span>${f.left>=0?"Left over":"Short each month"}</span></span><span class="num" style="margin-left:auto;color:var(--${f.left<0?"crit":"good"})">${money(f.left)} <span class="muted small">${t.income>0?pct(f.left,t.income)+"%":""}</span></span></summary><div class="body"><p class="muted">${f.left>=0?"This is the grey space at the end of the bar. It is not assigned to anything, so it tends to disappear into day-to-day spending unless you give it a job. The Save tab helps you do that.":"Your planned bills are higher than your income. Look for the largest categories above first, and check the statement check for charges you can cut."}</p></div></details></div>
+    ${why("Each bill is turned into a monthly amount so everything can be compared fairly. Weekly amounts are multiplied by 52 and divided by 12, and biweekly ones by 26 and divided by 12. The coloured bar is your whole monthly income. Each colour is a category, and the grey space at the end is what is left. Tap a category to see what is inside it. To move a bill to a different category, edit it under Accounts.","How to read this")}
+  </div></div>
+  ${t.income>0?`<div class="card"><div class="stack"><h2>Needs, wants, saving</h2>
+    <div class="bars">${guide.map(([k,l,gd,d])=>`<div><div class="row small"><span><strong>${l}</strong> <span class="muted">${d}</span></span><span class="num">${pct(g[k],tot)}% <span class="muted">guide ${gd}%</span></span></div><div class="bar-track" style="margin-top:5px" title="${l}: ${pct(g[k],tot)}%, guide ${gd}%"><div class="bar-fill" style="width:${Math.min(100,g[k]/tot*100)}%"></div><span class="bar-tick" style="left:${gd}%"></span></div></div>`).join("")}</div>
+    ${why("A popular starting point called 50/30/20 suggests about half of take-home pay for needs, 30% for wants and 20% for saving and paying debt faster. The small dark mark on each bar is the guide and the blue bar is you. It is a yardstick and not a rule. In expensive housing markets, needs often run above 50%. Its use is to show which bucket is squeezing the others. The grouping here is rough: everything except fun and savings is counted as a need.")}
+  </div></div>`:""}
+  <div class="card"><div class="stack"><div class="row"><h2>Money coming in</h2><button class="btn small" data-act="add-income">Add</button></div>${plan.incomes.length?`<ul class="list">${plan.incomes.map(i=>`<li><div class="li-main"><div class="t">${esc(i.name)}</div><div class="s num">${money(i.amt)} ${L.FREQ[i.freq].toLowerCase()}</div></div><div class="li-amt num">${money(i.amt*L.PER_MONTH[i.freq])}/mo</div></li>`).join("")}</ul>`:`<p class="muted">No paydays yet.</p>`}</div></div>`;
+}
+function flowDays(t,proj){
+  const cushion=Number(plan.cushion)||0,hasPlan=plan.incomes.length||plan.bills.length;
+  const cut=L.addDays(TODAY,showAll?90:30),evs=proj.events.filter(e=>e.date<=cut);
+  let html="",wk=null;
+  for(const e of evs){
+    const w=Math.floor(L.diffDays(TODAY,e.date)/7);
+    if(w!==wk){wk=w;html+=`<li class="wk" style="border-top:0">${w===0?"Next 7 days":"Week of "+dfmt(L.addDays(TODAY,w*7))}</li>`;}
+    const flag=e.bal<0?pill("crit","Short"):e.bal<cushion?pill("warn","Under cushion"):"";
+    html+=`<li><div class="li-main"><div class="t">${esc(e.name)}</div><div class="s">${dfmt(e.date,{weekday:"short"})} ${flag}</div></div><div class="li-amt num"><div class="${e.kind==="in"?"in":""}">${e.kind==="in"?"+":"−"}${money(Math.abs(e.amt))}</div><div class="s">${money(e.bal)} after</div></div></li>`;
+  }
+  const lv=proj.low.bal<0?"crit":proj.low.bal<cushion?"warn":"good";
+  return `
+  <div class="card"><div class="stack">
+    <div class="row"><h2>Your balance, day by day</h2>${hasPlan?pill(lv,lv==="crit"?"Shortfall ahead":lv==="warn"?"Dips under cushion":"Stays above cushion"):""}</div>
+    <p class="small muted num">Starting from ${money(proj.start)}${t.payNames.length?" in "+esc(t.payNames.join(" and ")):""}, the balance you last entered.${t.payNames.length?"":" Mark a chequing account as the one bills come out of."}</p>
+    <div id="flow-chart" role="img" aria-label="Projected bill-paying balance for the next 90 days. Lowest ${money(proj.low.bal)} on ${dfmt(proj.low.date)}, ending at ${money(proj.end)}."></div>
+    <div class="inline-field"><label for="cushion" class="small">Keep at least</label><input type="text" inputmode="decimal" id="cushion" value="${esc(cushion)}"><span class="small muted">in the account</span></div>
+    ${why("The line is the balance of your bill-paying account. It steps up on each payday and down on each bill. The dashed line is your cushion, the minimum you want to keep so a surprise does not overdraw you. The dot marks the lowest day. If the line dips under the cushion, the fix is usually timing: moving a bill's due date, or holding back a little from the payday before. Touch the chart to see any single day. The forecast is only as current as the balance you last typed in under Accounts.","How to read this")}
+  </div></div>
+  <div class="card"><div class="stack">
+    <div class="row"><h2>What is coming</h2><div class="actions"><button class="btn small" data-act="add-income">Add payday</button><button class="btn small" data-act="add-bill">Add bill</button></div></div>
+    ${evs.length?`<ul class="list">${html}</ul><button class="btn" data-act="toggle-all">${showAll?"Show the next 30 days only":"Show all 90 days"}</button>`:`<p class="muted">Nothing scheduled yet. Add a payday and your regular bills to see your balance day by day.</p>`}
+  </div></div>`;
+}
+function niceStep(range){const raw=range/3,p=Math.pow(10,Math.floor(Math.log10(raw))),n=raw/p;return (n<1.5?1:n<3.5?2:n<7.5?5:10)*p;}
+function drawFlow(){
+  const box=$("#flow-chart");if(!box||!flowData)return;
+  const {proj,cushion}=flowData,d=proj.daily,n=d.length;
+  const W=Math.max(280,box.clientWidth||320),H=220,m={l:48,r:8,t:14,b:24};
+  const vals=d.map(x=>x.bal);let mn=Math.min(0,cushion,...vals),mx=Math.max(cushion,1,...vals);const pad=(mx-mn)*.1;mx+=pad;if(mn<0)mn-=pad;
+  const x=i=>m.l+i/(n-1)*(W-m.l-m.r),y=v=>m.t+(mx-v)/(mx-mn)*(H-m.t-m.b);
+  let line="M"+x(0).toFixed(1)+","+y(d[0].bal).toFixed(1);
+  for(let i=1;i<n;i++)line+="H"+x(i).toFixed(1)+"V"+y(d[i].bal).toFixed(1);
+  const area=line+"V"+y(0).toFixed(1)+"H"+x(0).toFixed(1)+"Z";
+  const step=niceStep(mx-mn);let grid="";
+  const lab=v=>Math.abs(v)>=10000?(v<0?"−":"")+"$"+Math.abs(v/1000)+"k":money(v);
+  for(let v=Math.ceil(mn/step)*step;v<=mx;v+=step){const yy=y(v);grid+=`<line x1="${m.l}" x2="${W-m.r}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${m.l-6}" y="${yy+4}" font-size="11" fill="var(--ink-2)" text-anchor="end">${lab(v)}</text>`;}
+  let ticks="";
+  d.forEach((p,i)=>{if(p.date.slice(8)==="01"&&i>8&&i<n-14)ticks+=`<text x="${x(i)}" y="${H-6}" font-size="11" fill="var(--ink-2)" text-anchor="middle">${dfmt(p.date,{day:undefined})}</text>`;});
+  ticks+=`<text x="${m.l}" y="${H-6}" font-size="11" fill="var(--ink-2)">Today</text><text x="${W-m.r}" y="${H-6}" font-size="11" fill="var(--ink-2)" text-anchor="end">${dfmt(d[n-1].date)}</text>`;
+  const li=d.findIndex(p=>p.date===proj.low.date),lx=x(li),ly=y(proj.low.bal),anchor=lx<m.l+60?"start":lx>W-70?"end":"middle";
+  const lowLab=`<circle cx="${lx}" cy="${ly}" r="5" fill="${proj.low.bal<0?"var(--crit)":"var(--ink)"}" stroke="var(--card)" stroke-width="2"/><text x="${lx}" y="${Math.min(H-m.b-4,ly+18)}" font-size="12" font-weight="600" fill="var(--ink)" text-anchor="${anchor}" paint-order="stroke" stroke="var(--card)" stroke-width="3">Low ${money(proj.low.bal)}</text>`;
+  const cush=cushion>0?`<line x1="${m.l}" x2="${W-m.r}" y1="${y(cushion)}" y2="${y(cushion)}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-m.r-2}" y="${y(cushion)-4}" font-size="11" fill="var(--ink-2)" text-anchor="end" paint-order="stroke" stroke="var(--card)" stroke-width="3">Cushion ${money(cushion)}</text>`:"";
+  const y0=y(0);
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+    <defs><clipPath id="cp-up"><rect x="0" y="0" width="${W}" height="${y0}"/></clipPath><clipPath id="cp-dn"><rect x="0" y="${y0}" width="${W}" height="${H-y0}"/></clipPath></defs>
+    ${grid}<path d="${area}" fill="var(--accent)" opacity=".14" clip-path="url(#cp-up)"/><path d="${area}" fill="var(--crit)" opacity=".25" clip-path="url(#cp-dn)"/>
+    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>${cush}${ticks}${lowLab}
+    <circle cx="${x(n-1)}" cy="${y(d[n-1].bal)}" r="4" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/>
+    <line id="xh" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/><circle id="xd" r="4.5" fill="var(--ink)" stroke="var(--card)" stroke-width="2" visibility="hidden"/>
+  </svg><div class="tip" hidden></div>`;
+  const svg=box.querySelector("svg"),tip=box.querySelector(".tip"),xh=box.querySelector("#xh"),xd=box.querySelector("#xd");
+  const move=ev=>{
+    const r=svg.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W,i=Math.max(0,Math.min(n-1,Math.round((px-m.l)/(W-m.l-m.r)*(n-1)))),p=d[i];
+    xh.setAttribute("x1",x(i));xh.setAttribute("x2",x(i));xh.setAttribute("visibility","visible");xd.setAttribute("cx",x(i));xd.setAttribute("cy",y(p.bal));xd.setAttribute("visibility","visible");
+    tip.innerHTML=`<strong>${dfmt(p.date,{weekday:"short"})}</strong><br>${money(p.bal)}`+proj.events.filter(e=>e.date===p.date).map(e=>`<br>${esc(e.name)} ${e.amt>0?"+":""}${money(e.amt)}`).join("");
+    tip.hidden=false;tip.style.left=Math.max(0,Math.min(r.width-tip.offsetWidth,x(i)/W*r.width-tip.offsetWidth/2))+"px";tip.style.top="0px";
+  };
+  const hide=()=>{tip.hidden=true;xh.setAttribute("visibility","hidden");xd.setAttribute("visibility","hidden");};
+  svg.addEventListener("pointermove",move);svg.addEventListener("pointerdown",move);svg.addEventListener("pointerleave",hide);
+}
+function flowCheck(){
+  const R=L.analyse(txs),marks=plan.marks||{};
+  const sources={};for(const x of txs){const s=sources[x.s]=sources[x.s]||{n:0,first:x.d,last:x.d};s.n++;if(x.d<s.first)s.first=x.d;if(x.d>s.last)s.last=x.d;}
+  const upload=`<div class="card"><div class="stack"><h2>${txs.length&&!sample?"Add another statement":"Import a statement"}</h2>
+    <p class="small muted">On your bank or card website, look for Download or Export transactions and choose CSV. Two or three months per account works best the first time, then one file a month. On iPhone, save the file to Files and choose it here. The file is read on this device and goes nowhere else.</p>
+    <div class="drop" id="drop"><label class="btn primary" for="file">Choose CSV files</label><input type="file" id="file" accept=".csv,.txt,text/csv" multiple hidden><span class="small muted">or drop them here</span></div>
+    ${importNote?`<p class="note ${importNote.err?"err":""}">${esc(importNote.text)}</p>`:""}
+    ${Object.keys(sources).length?`<ul class="list">${Object.keys(sources).map(s=>`<li><div class="li-main"><div class="t">${esc(s)}</div><div class="s num">${sources[s].n} transactions, ${dfmt(sources[s].first)} to ${dfmt(sources[s].last)}</div></div>${sample?"":`<div class="actions"><button class="btn small" data-act="swap-src" data-src="${esc(s)}" title="Use this if spending and deposits look reversed">Swap in and out</button><button class="btn small danger" data-act="del-src" data-src="${esc(s)}">Remove</button></div>`}</li>`).join("")}</ul>`:""}
+  </div></div>`;
+  if(!txs.length)return upload+`<div class="card"><p class="muted">A leak is money leaving that you would stop if you noticed it. Once a statement is loaded, this page finds your pay and regular bills, sorts your spending into categories, and lists repeating charges, fees, small purchases that add up and possible double charges.</p></div>`;
+  const rec=R.recurring,cutTotal=rec.filter(r=>marks[r.key]==="cut").reduce((a,r)=>a+r.annual,0);
+  const ordered=[...rec.filter(r=>marks[r.key]!=="keep"),...rec.filter(r=>marks[r.key]==="keep")];
+  const recMonthly=rec.reduce((a,r)=>a+r.monthly,0),habMonthly=R.habits.reduce((a,h)=>a+h.perMonth,0),maxM=Math.max(1,...R.byMonth.map(b=>b.total));
+  return `
+  <div class="tiles">
+    <div class="tile"><span class="lab">Fees and interest</span><span class="val num">${money(R.fees.total)}</span><span class="sub num">about ${money(R.fees.perMonth*12)} a year</span></div>
+    <div class="tile"><span class="lab">Repeating charges</span><span class="val num">${money(recMonthly)}</span><span class="sub">a month across ${rec.length}</span></div>
+    <div class="tile"><span class="lab">Small and frequent</span><span class="val num">${money(habMonthly)}</span><span class="sub">a month</span></div>
+    <div class="tile"><span class="lab">Possible double charges</span><span class="val num">${R.dups.length}</span><span class="sub">worth a look</span></div>
+  </div>
+  <p class="small muted num" style="padding:0 4px">${R.count} transactions from ${dfmt(R.first,{year:"numeric"})} to ${dfmt(R.last,{year:"numeric"})}. ${R.transfers} transfers and card or loan payments are left out so nothing is counted twice.</p>
+  ${R.months<1.7?`<p class="note">Regular pay, bills and repeating charges only show up with two or more months of statements. Add an earlier month to find them.</p>`:""}
+  ${suggestCard()}${spendCard()}
+  <div class="card"><div class="stack"><div class="row"><h2>Repeating charges</h2>${cutTotal?pill("good","Cutting saves "+money(cutTotal)+" a year"):""}</div>
+    ${rec.length?`<ul class="list">${ordered.map(r=>{const mk=marks[r.key];return `<li style="flex-wrap:wrap"><div class="li-main"><div class="t ${mk==="cut"?"struck":""}">${esc(r.name)}</div><div class="s num">${money2(r.monthly)} a month, ${money(r.annual)} a year ${r.creep?pill("warn","Up from "+money2(r.creep.from)+" to "+money2(r.creep.to)):""}</div></div>${sample?"":`<div class="actions"><button class="btn small" data-act="mark" data-key="${esc(r.key)}" data-v="keep" aria-pressed="${mk==="keep"}">Keep</button><button class="btn small" data-act="mark" data-key="${esc(r.key)}" data-v="cut" aria-pressed="${mk==="cut"}">Cut</button><button class="btn small" data-act="to-bill" data-key="${esc(r.key)}">Add to bills</button></div>`}</li>`;}).join("")}</ul>`:`<p class="muted">None found yet.</p>`}
+    ${why("A charge shows here when the same place bills you a similar amount in two or more different months. Go down the list and ask of each one: would I sign up for this again today at this price? Mark it Keep or Cut. Cut is a note to yourself; you still cancel it with the provider. A warning tag means the price has gone up since the earliest statement.")}
+  </div></div>
+  <div class="card"><div class="stack"><h2>Fees and interest</h2>
+    ${R.fees.items.length?`<ul class="list">${R.fees.items.map(x=>`<li><div class="li-main"><div class="t">${esc(x.name)}</div><div class="s">${x.count} time${x.count>1?"s":""}</div></div><div class="li-amt num">${money2(x.total)}</div></li>`).join("")}</ul>`:`<p class="muted">No fees or interest charges found in these statements.</p>`}
+    ${why("This is money that bought nothing. Monthly account fees can often be waived by keeping a minimum balance or switching account type, and it is worth asking. Interest charges fall as the balance behind them falls.")}
+  </div></div>
+  <div class="card"><div class="stack"><h2>Small and frequent</h2>
+    ${R.habits.length?`<ul class="list">${R.habits.map(h=>`<li><div class="li-main"><div class="t">${esc(h.name)}</div><div class="s num">${h.count} visits, ${money2(h.avg)} on average</div></div><div class="li-amt num"><div>${money(h.perMonth)}/mo</div><div class="s">${money(h.perMonth*12)}/yr</div></div></li>`).join("")}</ul>`:`<p class="muted">Nothing fits this pattern.</p>`}
+    ${why("Places where you pay under $30 at least four times a month. None of these is a problem on its own, and some are well worth it. Seeing the yearly figure lets you decide on purpose.")}
+  </div></div>
+  ${R.dups.length?`<div class="card"><div class="stack"><h2>Possible double charges</h2><p class="small muted">Same place, same amount, within a day. Some are real repeat purchases.</p><ul class="list">${R.dups.map(x=>`<li><div class="li-main"><div class="t">${esc(x.name)}</div><div class="s">${dfmt(x.d1)}${x.d2!==x.d1?" and "+dfmt(x.d2):", twice"}</div></div><div class="li-amt num">${money2(x.amt)} each</div></li>`).join("")}</ul></div></div>`:""}
+  <div class="card"><div class="stack"><details class="more"><summary><h2>Spending by month</h2></summary><div class="body"><div class="bars">${R.byMonth.map(b=>`<div class="bar-row" title="${b.month}: ${money(b.total)}"><span>${dfmt(b.month+"-01",{day:undefined,year:"numeric"})}</span><div class="bar-track"><div class="bar-fill" style="width:${b.total/maxM*100}%"></div></div><span class="num">${money(b.total)}</span></div>`).join("")}</div><p class="small muted">The first and last months may be partial.</p></div></details>
+</div></div>
+  ${upload}`;
+}
+function bindUpload(){
+  const f=$("#file"),drop=$("#drop");if(!f)return;
+  f.addEventListener("change",()=>handleFiles(f.files));
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+  drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");handleFiles(e.dataTransfer.files);});
+}
+/* ---- Save ---- */
+function payInfo(){const i=plan.incomes[0];const f=i?i.freq:"monthly";const ppm=L.PER_MONTH[f]||1;return {ppm:ppm||1,word:f==="weekly"?"week":f==="biweekly"?"payday":f==="semimonthly"?"payday":"month",inc:i};}
+function whatIfOut(t,f){
+  const pi=payInfo(),v=whatIf||0,monthly=v*pi.ppm;
+  const p2=L.project(Object.assign({},plan,{bills:plan.bills.concat(v>0?[{name:"x",amt:v,freq:pi.inc?pi.inc.freq:"monthly",date:pi.inc?pi.inc.date:TODAY}]:[])}),TODAY,90);
+  const cushion=Number(plan.cushion)||0,ok=p2.low.bal>=cushion,over=monthly>Math.max(0,f.left)+.5;
+  return `<p class="num"><strong>${money(monthly)}</strong> a month · <strong>${money(monthly*12)}</strong> a year · <strong>${money(monthly*60)}</strong> in five years, before any interest.</p>
+  <p class="num">${v<=0?"Slide to try an amount.":over?pill("crit","More than is left over")+" This is more than your plan leaves each month, so something else would have to give.":ok?pill("good","Fits")+` Your account's lowest point in the next 90 days would be ${money(p2.low.bal)}, still above your ${money(cushion)} cushion.`:pill("warn","Tight")+` Your account would dip to ${money(p2.low.bal)} on ${dfmt(p2.low.date)}, under your ${money(cushion)} cushion. A slightly smaller amount avoids that.`}</p>`;
+}
+function renderSave(t,proj,f){
+  const el=$("#v-save"),pi=payInfo();
+  if(!plan.incomes.length&&!plan.bills.length){el.innerHTML=`<div class="card"><div class="stack"><h2>First, the basics</h2><p class="muted">Saving starts with knowing what is left after the bills. Add a payday and your regular bills and this page works out what you can set aside.</p><div><button class="btn primary" data-act="add-income">Add a payday</button></div></div></div>`;return;}
+  const perPay=Math.max(0,f.left)/pi.ppm,max=Math.max(100,Math.ceil(perPay*1.25/10)*10);
+  if(whatIf===null)whatIf=Math.round(perPay*.5/10)*10;
+  const ess=Object.keys(f.cats).filter(k=>k!=="fun"&&k!=="savings").reduce((a,k)=>a+f.cats[k].total,0);
+  const efTarget=ess*(plan.efMonths||3),efNow=plan.accounts.filter(a=>a.type==="savings").reduce((a,x)=>a+(Number(x.bal)||0),0);
+  const monthly=(whatIf||0)*pi.ppm,R=L.analyse(txs),marks=plan.marks||{};
+  const finds=[];
+  if(R.fees.total>0)finds.push(["Bank fees and interest charges",R.fees.perMonth*12,"From your statements, at the current pace"]);
+  const cut=R.recurring.filter(r=>marks[r.key]==="cut").reduce((a,r)=>a+r.annual,0);if(cut>0)finds.push(["Repeating charges you marked Cut",cut,"Cancel them with the provider to make it real"]);
+  const undecided=R.recurring.filter(r=>!marks[r.key]).reduce((a,r)=>a+r.annual,0);if(undecided>0)finds.push(["Repeating charges not reviewed yet",undecided,"Keep or cut each one in the statement check"]);
+  if(R.habits[0])finds.push([R.habits[0].name+" visits",R.habits[0].perMonth*12,"Your most frequent small purchase"]);
+  if(t.topRate)finds.push(["Interest on "+t.topRate.name,t.topRate.monthly*12,"At "+t.topRate.rate+"%, your most expensive debt"]);
+  el.innerHTML=`
+  <div class="card"><div class="stack"><span class="eyebrow">Left over each month</span><span class="big num" style="color:var(--${f.left<0?"crit":"ink"})">${money(f.left)}</span>
+    <p class="muted num">${f.left>0?`That is about ${money(perPay)} per ${pi.word}. Right now it has no job, so it tends to drift into everyday spending.`:f.left===0?"Every dollar is already assigned.":"Your plan spends more than it brings in. Start with the ideas under Places to find money."}</p>
+    ${why("This is your monthly income minus every bill and payment you have entered, including any savings transfers already in your plan. It is the pool that new saving comes from. If the number looks too generous, the usual reason is everyday spending that is not in your bills list yet.")}
+  </div></div>
+  <div class="card"><div class="stack"><h2>Try an amount</h2>
+    <label for="wi" class="small muted">Set aside each ${pi.word}</label>
+    <div class="row"><span class="big num" id="wi-val" style="font-size:2rem">${money(whatIf)}</span></div>
+    <input type="range" id="wi" min="0" max="${max}" step="10" value="${whatIf}" aria-label="Amount to set aside each ${pi.word}">
+    <div id="wi-out" class="stack" style="gap:8px">${whatIfOut(t,f)}</div>
+    ${sample?"":`<div><button class="btn primary" data-act="add-saving">Add this to my plan</button></div>`}
+    ${why("Moving the slider tests an automatic transfer on each payday and re-runs your 90-day forecast with it included, so you can see whether it fits before you commit. Adding it to your plan creates a Savings bill on your payday. You then set up the matching automatic transfer at your bank, which is the step that makes it happen. This is called paying yourself first.")}
+  </div></div>
+  <div class="card"><div class="stack"><div class="row"><h2>Emergency fund</h2><div class="seg" style="flex:0 0 auto">${[1,3,6].map(n=>`<button data-act="ef" data-v="${n}" aria-pressed="${(plan.efMonths||3)===n}">${n} mo</button>`).join("")}</div></div>
+    <p class="num"><strong>${money(efNow)}</strong> of ${money(efTarget)}</p>
+    <div class="progress" role="img" aria-label="${pct(efNow,efTarget)}% of emergency fund target"><i style="width:${Math.min(100,efTarget?efNow/efTarget*100:0)}%"></i></div>
+    <p class="small muted num">${efTarget<=0?"Add your bills to set a target.":efNow>=efTarget?"Target reached.":monthly>0?`At ${money(monthly)} a month you would get there in about ${Math.ceil((efTarget-efNow)/monthly)} months.`:"Pick an amount above to see how long it would take."}</p>
+    ${why(`The target is ${plan.efMonths||3} month${(plan.efMonths||3)>1?"s":""} of your essential costs, ${money(ess)} a month. Essentials are everything in your plan except fun and savings. The amount counted is what sits in your savings accounts, since chequing is spoken for by bills. This fund exists so a repair or a gap in income does not become card debt. One month first, then build.`)}
+  </div></div>
+  <div class="card"><div class="stack"><div class="row"><h2>Goals</h2><button class="btn small" data-act="add-goal">Add</button></div>
+    ${plan.goals.length?`<div class="stack">${plan.goals.map(g=>{const left=Math.max(0,g.target-g.saved);let line=left<=0?"Reached.":"";if(left>0&&g.date&&g.date>TODAY){const mo=Math.max(1,L.diffDays(TODAY,g.date)/30.44);line=`${money(left)} to go. About ${money(left/mo)} a month gets you there by ${dfmt(g.date,{day:undefined,year:"numeric"})}.`;}else if(left>0)line=`${money(left)} to go.`+(monthly>0?` At ${money(monthly)} a month, about ${Math.ceil(left/monthly)} months.`:"");
+      return `<div><div class="row"><span><strong>${esc(g.name)}</strong></span><span class="num small">${money(g.saved)} of ${money(g.target)}</span></div><div class="progress" style="margin:6px 0" role="img" aria-label="${pct(g.saved,g.target)}% of ${esc(g.name)}"><i style="width:${Math.min(100,g.target?g.saved/g.target*100:0)}%"></i></div><div class="row"><span class="small muted num">${line}</span>${sample?"":`<button class="btn small" data-act="edit-goal" data-id="${g.id}">Edit</button>`}</div></div>`;}).join("")}</div>`:`<p class="muted">Name something you are saving for: a holiday, a car, a down payment. A named goal with a number is far easier to stick to than "save more".</p>`}
+  </div></div>
+  <div class="card"><div class="stack"><h2>Places to find money</h2>
+    ${finds.length?`<ul class="list">${finds.map(x=>`<li><div class="li-main"><div class="t">${esc(x[0])}</div><div class="s">${esc(x[2])}</div></div><div class="li-amt num">${money(x[1])}<div class="s">a year</div></div></li>`).join("")}</ul>`:`<p class="muted">Check a statement and enter your debts' interest rates, and ideas appear here.</p>`}
+    <div><button class="btn small" data-act="go-check">Open the statement check</button></div>
+    ${why("These are the amounts your own numbers point to, shown per year so they can be compared. They are possibilities and not instructions. Fees and interest are usually the easiest wins because nothing is given up to remove them.")}
+  </div></div>`;
+}
+
+/* ---- Learn ---- */
+function touchLearn(){
+  if(learn.last===TODAY)return;
+  learn.streak=learn.last===L.addDays(TODAY,-1)?(learn.streak||0)+1:1;learn.last=TODAY;saveLearn();
+}
+const W={
+  compound:{f:[["start","Starting amount"],["add","Added each month"],["rate","Yearly growth %"],["yrs","Years"]],calc:v=>{const r=v.rate/1200,n=Math.max(0,v.yrs)*12,g=Math.pow(1+r,n),fv=v.start*g+(r?v.add*(g-1)/r:v.add*n),put=v.start+v.add*n;return `Ends at <strong>${money(fv)}</strong>. You put in ${money(put)}; growth added ${money(fv-put)}.`;}},
+  rule72:{f:[["rate","Yearly rate %"]],calc:v=>v.rate>0?`Doubles in about <strong>${(72/v.rate).toFixed(1)} years</strong> by the rule. The exact answer is ${(Math.log(2)/Math.log(1+v.rate/100)).toFixed(1)} years.`:"Enter a rate above zero."},
+  payoff:{f:[["bal","Balance"],["apr","Interest rate %"],["pay","Payment each month"]],calc:v=>{const r=v.apr/1200,i=v.bal*r;if(v.pay<=0||v.bal<=0)return "Enter a balance and a payment.";if(v.pay<=i)return `<strong>Never paid off.</strong> The first month's interest is ${money2(i)}, which is more than the payment.`;const n=r?-Math.log(1-r*v.bal/v.pay)/Math.log(1+r):v.bal/v.pay,y=Math.floor(n/12),mo=Math.ceil(n-y*12);return `Paid off in <strong>${y?y+" yr ":""}${mo} mo</strong>, with about ${money(n*v.pay-v.bal)} of interest on top of the ${money(v.bal)}.`;}},
+  mortgage:{f:[["bal","Amount owing"],["rate","Interest rate %"],["yrs","Years left"],["extra","Extra each month"]],calc:v=>{const r=v.rate/1200,n=v.yrs*12;if(!(v.bal>0&&n>0))return "Enter an amount and years.";const p=r?v.bal*r/(1-Math.pow(1+r,-n)):v.bal/n,ti=p*n-v.bal;let s=`Payment about <strong>${money(p)}</strong> a month. In month one, ${money(v.bal*r)} is interest and ${money(p-v.bal*r)} reduces the loan. Total interest ${money(ti)}.`;if(v.extra>0){const n2=r?-Math.log(1-r*v.bal/(p+v.extra))/Math.log(1+r):v.bal/(p+v.extra);s+=` Adding ${money(v.extra)} a month finishes ${((n-n2)/12).toFixed(1)} years sooner and saves about ${money(ti-(n2*(p+v.extra)-v.bal))}.`;}return s+` <span class="muted">Simplified, with monthly compounding.</span>`;}},
+  fees:{f:[["amt","Amount invested"],["yrs","Years"],["ret","Return before fees %"],["feeA","Fee A %"],["feeB","Fee B %"]],calc:v=>{const a=v.amt*Math.pow(1+(v.ret-v.feeA)/100,v.yrs),b=v.amt*Math.pow(1+(v.ret-v.feeB)/100,v.yrs);return `Fee A leaves <strong>${money(a)}</strong>. Fee B leaves <strong>${money(b)}</strong>. Difference: ${money(Math.abs(b-a))}.`;}},
+  inflation:{f:[["amt","Amount today"],["rate","Inflation % a year"],["yrs","Years"]],calc:v=>`In ${v.yrs} years, ${money(v.amt)} buys what <strong>${money(v.amt/Math.pow(1+v.rate/100,v.yrs))}</strong> buys today.`},
+  sinking:{f:[["amt","Yearly amount"]],calc:v=>`<strong>${money2(v.amt/12)}</strong> a month, ${money2(v.amt/24)} twice a month, ${money2(v.amt/26)} every two weeks, or ${money2(v.amt/52)} a week.`}
+};
+function widget(type,d){
+  const w=W[type];
+  return `<div class="widget" data-w="${type}"><span class="eyebrow">Try it with your own numbers</span><div class="ins">${w.f.map(([k,l])=>`<label>${k==="amt"&&d.label?esc(d.label):l}<input type="text" inputmode="decimal" data-k="${k}" id="w-${type}-${k}" value="${d[k]!=null?d[k]:0}"></label>`).join("")}</div><div class="out num">${w.calc(d)}</div></div>`;
+}
+function renderLearn(t,proj){
+  const el=$("#v-learn"),today=todaysLesson(),l=LESSONS.find(x=>x.id===lessonId)||today,done=Object.keys(learn.done).filter(k=>LESSONS.find(x=>x.id===k)).length;
+  let wd=l.widget?Object.assign({},l.widget[1]):null;
+  if(wd&&l.id==="apr"&&t.topRate&&!sample)wd={bal:Math.round(t.topRate.bal),apr:t.topRate.rate,pay:Math.max(25,Math.round(t.topRate.bal*.05/5)*5)};
+  const yours=l.yours?l.yours(t,money,proj):null,topics=[...new Set(LESSONS.map(x=>x.topic))];
+  el.innerHTML=`
+  <div class="card"><div class="row"><div class="streak"><div><div class="n num">${learn.streak||1}</div><div class="small muted">day streak</div></div><div><div class="n num">${done}<span class="muted" style="font-size:1rem;font-weight:500"> / ${LESSONS.length}</span></div><div class="small muted">lessons learned</div></div></div><button class="btn small" data-act="surprise">Surprise me</button></div>
+  <div class="progress" style="margin-top:14px" role="img" aria-label="${done} of ${LESSONS.length} lessons learned"><i style="width:${done/LESSONS.length*100}%"></i></div></div>
+  <div class="card lesson" id="lesson"><div class="stack"><div class="row"><span class="eyebrow">${l.id===today.id?"Today's lesson":"Lesson"} · ${esc(l.topic)}</span>${learn.done[l.id]?pill("good","Learned"):""}</div>
+    <h2 style="font-size:1.35rem">${esc(l.title)}</h2>
+    ${l.body.map(p=>`<p>${esc(p)}</p>`).join("")}
+    <div class="ex"><span class="eyebrow">In real numbers</span><p>${esc(l.ex)}</p></div>
+    ${yours?`<div class="yours"><span class="eyebrow">${sample?"With the example numbers":"With your numbers"}</span><p class="num">${esc(yours)}</p></div>`:""}
+    ${wd?widget(l.widget[0],wd):""}
+    <div class="quiz" data-a="${l.quiz.a}"><span class="eyebrow">Quick check</span><p><strong>${esc(l.quiz.q)}</strong></p>${l.quiz.opts.map((o,i)=>`<button data-act="quiz" data-i="${i}">${esc(o)}</button>`).join("")}<p class="note" id="quiz-why" hidden>${esc(l.quiz.why)}</p></div>
+    <div><span class="eyebrow">Curious? Search for</span><div class="chips" style="margin-top:6px">${l.look.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div></div>
+    <div class="row"><button class="btn ${learn.done[l.id]?"":"primary"}" data-act="learned" data-id="${l.id}">${learn.done[l.id]?"Mark as not learned":"Got it, mark as learned"}</button>${l.id!==today.id?`<button class="btn" data-act="open-today">Back to today's</button>`:""}</div>
+  </div></div>
+  <div class="card"><div class="stack" style="gap:4px"><h2>All lessons</h2>${topics.map(tp=>`<details class="more" ${tp===l.topic?"open":""}><summary><span>${esc(tp)}</span><span class="muted small num" style="margin-left:auto">${LESSONS.filter(x=>x.topic===tp&&learn.done[x.id]).length} of ${LESSONS.filter(x=>x.topic===tp).length}</span></summary><div class="body"><ul class="list">${LESSONS.filter(x=>x.topic===tp).map(x=>`<li><div class="li-main"><div class="t">${esc(x.title)}</div></div>${learn.done[x.id]?pill("good","Learned"):""}<button class="btn small" data-act="lesson" data-id="${x.id}">${x.id===l.id?"Open":"Read"}</button></li>`).join("")}</ul></div></details>`).join("")}
+  <p class="small muted" style="padding-top:8px">These lessons explain general concepts. They are education, not personal financial advice.</p></div></div>`;
+}
+
+/* ---- Accounts ---- */
+function renderAccounts(t){
+  const el=$("#v-accounts");
+  const grp=side=>plan.accounts.filter(a=>L.TYPES[a.type]&&L.TYPES[a.type].side===side);
+  const acct=a=>`<li><div class="li-main"><div class="t">${esc(a.name)}</div><div class="s num">${L.TYPES[a.type].label}${a.reg?" \u00b7 "+esc(a.reg):""}${a.rate?" · "+a.rate+"%":""}${a.limit?" · limit "+money(a.limit):""}${a.payFrom?" · bills come out of here":""}${a.updated?" · updated "+dfmt(a.updated):""}</div></div><div class="li-amt num">${money(a.bal)}</div>${sample?"":`<button class="btn small" data-act="edit-account" data-id="${a.id}">Edit</button>`}</li>`;
+  const sched=(x,kind)=>`<li><div class="li-main"><div class="t">${esc(x.name)}</div><div class="s">${kind==="bill"?(CATS[x.cat]||CATS.other).label+" · ":""}${L.FREQ[x.freq]}, next ${x.date?dfmt((L.occurrences(x,TODAY,L.addDays(TODAY,400))[0])||x.date):"date not set"}</div></div><div class="li-amt num">${money(x.amt)}</div>${sample?"":`<button class="btn small" data-act="edit-${kind}" data-id="${x.id}">Edit</button>`}</li>`;
+  el.innerHTML=`
+  ${sample||!plan.accounts.length?"":`<div class="card"><div class="row"><div class="li-main"><div class="t">Quick update</div><div class="s">Copy today's balances from your banking app in one go.</div></div><button class="btn primary" data-act="balances">Update balances</button></div></div>`}
+  <div class="card"><div class="stack"><div class="row"><h2>What you own</h2><button class="btn small" data-act="add-account" data-side="own">Add</button></div>${grp("own").length?`<ul class="list">${grp("own").map(acct).join("")}</ul>`:`<p class="muted">Chequing, savings, investments, property.</p>`}</div></div>
+  <div class="card"><div class="stack"><div class="row"><h2>What you owe</h2><button class="btn small" data-act="add-account" data-side="owe">Add</button></div>${grp("owe").length?`<ul class="list">${grp("owe").map(acct).join("")}</ul>`:`<p class="muted">Credit cards, lines of credit, mortgage, loans.</p>`}
+    ${why("Enter the balance owing and the yearly interest rate from your statement. For cards and lines of credit, add the limit too. Update balances about once a month. A minute or two keeps every page here accurate.","What to enter")}</div></div>
+  <div class="card"><div class="stack"><div class="row"><h2>Paydays</h2><button class="btn small" data-act="add-income">Add</button></div>${plan.incomes.length?`<ul class="list">${plan.incomes.map(x=>sched(x,"income")).join("")}</ul><p class="small muted num">About ${money(t.income)} a month.</p>`:`<p class="muted">Use take-home pay, the amount that lands in your account.</p>`}</div></div>
+  <div class="card"><div class="stack"><div class="row"><h2>Bills and payments</h2><button class="btn small" data-act="add-bill">Add</button></div>${plan.bills.length?`<ul class="list">${plan.bills.map(x=>sched(x,"bill")).join("")}</ul><p class="small muted num">About ${money(t.bills)} a month.</p>`:`<p class="muted">Mortgage, loan and card payments, utilities, insurance. Add a weekly estimate for groceries and everyday spending so the picture is honest.</p>`}</div></div>
+  <div class="card"><div class="stack"><h2>Your data stays here</h2>
+    <p class="small muted">The app is an empty page at its own web address, and it can load only its own files. Your numbers are kept on this device, in this browser, and are never sent anywhere. Names and balances are all it needs, so leave out account and card numbers.</p><p class="small muted">Each device keeps its own copy. To use the same numbers on your iPhone and your Mac, export a backup on one and import it on the other.</p>
+    <p class="small muted">${plan.backup?"Last backup saved "+dfmt(plan.backup,{year:"numeric"})+".":"No backup saved yet."} A backup is a small file you keep wherever you like. It protects you if the browser's storage is cleared, and it is how you move to another device.</p>
+    <div class="actions" style="justify-content:flex-start">${sample?"":`<button class="btn" data-act="export">Export backup</button>`}<label class="btn" for="imp">Import backup</label><input type="file" id="imp" accept=".json,application/json" hidden>${sample?"":`<button class="btn danger" data-act="erase">Erase everything</button>`}</div>
+    <p class="note" id="data-note" hidden></p>
+  </div></div>
+  <div class="card"><div class="stack"><h2>Put it on your Home Screen</h2><p class="small muted"><strong>iPhone:</strong> open this page in Safari, tap the Share button, then Add to Home Screen. Open it from the new icon from then on, and enter your numbers there. <strong>Mac:</strong> in Safari choose File, then Add to Dock. After the first visit it opens without an internet connection.</p></div></div>`;
+  $("#imp").addEventListener("change",async e=>{
+    const file=e.target.files[0];if(!file)return;const note=$("#data-note");
+    try{const o=JSON.parse(await file.text());if(!o.plan||!Array.isArray(o.plan.accounts))throw 0;plan=Object.assign(emptyPlan(),o.plan);txs=Array.isArray(o.txs)?o.txs:[];if(o.learn){learn=Object.assign(learn,o.learn);saveLearn();}sample=false;whatIf=null;save();render();}
+    catch(err){note.textContent="That file is not a Waterline backup.";note.className="note err";note.hidden=false;}
+  });
+}
+async function exportBackup(){
+  plan.backup=TODAY;save();
+  const name="waterline-backup-"+TODAY+".json",blob=new Blob([JSON.stringify({app:"waterline",saved:TODAY,plan,txs,learn},null,1)],{type:"application/json"});
+  try{const file=new File([blob],name,{type:"application/json"});
+    if(/iPhone|iPad|Android/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});render();return;}
+  }catch(e){if(e&&e.name==="AbortError"){render();return;}}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();}catch(e){}
+  render();
+}
+
+/* ---- Dialog forms ---- */
+function openForm(kind,id,preset){
+  const dlg=$("#dlg");
+  const list=kind==="account"?plan.accounts:kind==="income"?plan.incomes:kind==="goal"?plan.goals:plan.bills;
+  const cur=id?list.find(x=>x.id===id):null;
+  let v=Object.assign(kind==="account"?{name:"",type:preset||"chequing",bal:"",rate:"",limit:"",payFrom:!plan.accounts.some(a=>a.payFrom)}:kind==="goal"?{name:"",target:"",saved:"",date:""}:{name:"",amt:"",freq:kind==="income"?"biweekly":"monthly",date:TODAY,cat:""},cur||{},typeof preset==="object"?preset:{});
+  const opt=(o,sel)=>Object.keys(o).map(k=>`<option value="${k}" ${k===sel?"selected":""}>${esc(o[k].label||o[k])}</option>`).join("");
+  function build(){
+    const T=L.TYPES[v.type]||{};
+    dlg.innerHTML=`<form class="f" id="f" novalidate><h2 id="dlg-title">${cur?"Edit ":"Add "}${kind==="account"?"account":kind==="income"?"payday":kind==="goal"?"goal":"bill"}</h2>`+
+    (kind==="account"?`
+      <label for="f-type">Type<select id="f-type">${opt(L.TYPES,v.type)}</select></label>
+      <label for="f-name">Name<input type="text" id="f-name" value="${esc(v.name)}" placeholder="${T.side==="owe"?"e.g. Travel card":"e.g. Main chequing"}" autocomplete="off"></label>
+      <label for="f-bal">${T.side==="owe"?"Balance owing":"Current balance"}<input type="text" inputmode="decimal" id="f-bal" value="${esc(v.bal)}" placeholder="0"></label>
+      ${T.rate?`<label for="f-rate">Interest rate, % a year<input type="text" inputmode="decimal" id="f-rate" value="${esc(v.rate||"")}" placeholder="e.g. 19.99"><span class="hint">It is printed on your statement.</span></label>`:""}
+      ${T.limit?`<label for="f-limit">Credit limit<input type="text" inputmode="decimal" id="f-limit" value="${esc(v.limit||"")}" placeholder="0"></label>`:""}
+      ${v.type==="invest"?`<label for="f-reg">Kind of account<select id="f-reg">${["","TFSA","RRSP","FHSA","RESP","Workplace pension","Non-registered"].map(x=>`<option ${x===(v.reg||"")?"selected":""} value="${x}">${x||"Not set"}</option>`).join("")}</select></label>`:""}
+      ${T.cash?`<label class="cb" for="f-pay"><input type="checkbox" id="f-pay" ${v.payFrom?"checked":""}>Bills come out of this account</label>`:""}`
+    :kind==="goal"?`
+      <label for="f-name">What is it for?<input type="text" id="f-name" value="${esc(v.name)}" placeholder="e.g. Holiday" autocomplete="off"></label>
+      <label for="f-target">Target amount<input type="text" inputmode="decimal" id="f-target" value="${esc(v.target)}" placeholder="0"></label>
+      <label for="f-saved">Saved so far<input type="text" inputmode="decimal" id="f-saved" value="${esc(v.saved)}" placeholder="0"></label>
+      <label for="f-date">Target date, optional<input type="date" id="f-date" value="${esc(v.date||"")}"></label>`
+    :`
+      <label for="f-name">Name<input type="text" id="f-name" value="${esc(v.name)}" placeholder="${kind==="income"?"e.g. Paycheque":"e.g. Car insurance"}" autocomplete="off"></label>
+      <label for="f-amt">${kind==="income"?"Take-home amount":"Amount"}<input type="text" inputmode="decimal" id="f-amt" value="${esc(v.amt)}" placeholder="0"></label>
+      <label for="f-freq">How often<select id="f-freq">${opt(L.FREQ,v.freq)}</select></label>
+      <label for="f-date">${kind==="income"?"Next payday":"Next due date"}<input type="date" id="f-date" value="${esc(v.date)}"><span class="hint">Later dates are worked out from this one.</span></label>
+      ${kind==="bill"?`<label for="f-cat">Category<select id="f-cat"><option value="">Choose for me</option>${opt(CATS,v.cat)}</select></label>`:""}`)+
+    `<p class="note err" id="f-err" hidden></p>
+     <div class="f-actions"><div>${cur?`<button type="button" class="btn danger" id="f-del">Delete</button>`:""}</div><div class="actions"><button type="button" class="btn" id="f-cancel">Cancel</button><button type="submit" class="btn primary">Save</button></div></div></form>`;
+    const g=i=>dlg.querySelector("#"+i);
+    if(kind==="account")g("f-type").addEventListener("change",()=>{v.name=g("f-name").value;v.bal=g("f-bal").value;v.type=g("f-type").value;build();});
+    g("f-cancel").addEventListener("click",()=>dlg.close());
+    if(cur){let armed=false;g("f-del").addEventListener("click",()=>{if(!armed){armed=true;g("f-del").textContent="Tap again to delete";return;}list.splice(list.indexOf(cur),1);dlg.close();save();render();});}
+    g("f").addEventListener("submit",e=>{
+      e.preventDefault();const name=g("f-name").value.trim(),err=g("f-err"),fail=m=>{err.textContent=m;err.hidden=false;};
+      if(!name)return fail("Give it a name so you can recognise it.");
+      let o;
+      if(kind==="account"){const T2=L.TYPES[g("f-type").value];o={name,type:g("f-type").value,bal:Math.abs(num(g("f-bal").value)),updated:TODAY};if(T2.rate)o.rate=num(g("f-rate").value);if(T2.limit)o.limit=num(g("f-limit").value);if(T2.cash)o.payFrom=g("f-pay").checked;if(o.type==="invest")o.reg=g("f-reg").value;}
+      else if(kind==="goal"){o={name,target:Math.abs(num(g("f-target").value)),saved:Math.abs(num(g("f-saved").value)),date:g("f-date").value};if(!o.target)return fail("Enter a target above zero.");}
+      else{o={name,amt:Math.abs(num(g("f-amt").value)),freq:g("f-freq").value,date:g("f-date").value};if(!o.amt)return fail("Enter an amount above zero.");if(!o.date)return fail("Pick a date.");if(kind==="bill")o.cat=g("f-cat").value||guessCat(name);}
+      if(cur){for(const k of ["rate","limit","payFrom","reg"])delete cur[k];Object.assign(cur,o);}else list.push(Object.assign({id:uid()},o));
+      if(v._key){plan.seen=plan.seen||{};plan.seen[v._key]=1;}
+      dlg.close();save();render();
+    });
+  }
+  build();
+  if(dlg.showModal)dlg.showModal();else dlg.setAttribute("open","");
+}
+
+/* ---- Events ---- */
+let eraseArmed=false;
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]");if(!b)return;const act=b.dataset.act;
+  if(act==="start"){leaveSample();render();location.hash="#home";return;}
+  if(act==="add-account"){leaveSample();render();return openForm("account",null,b.dataset.side==="owe"?"card":"chequing");}
+  if(act==="add-income"){leaveSample();render();return openForm("income");}
+  if(act==="add-bill"){leaveSample();render();return openForm("bill");}
+  if(act==="add-goal"){leaveSample();render();return openForm("goal");}
+  if(act==="edit-account")return openForm("account",b.dataset.id);
+  if(act==="edit-income")return openForm("income",b.dataset.id);
+  if(act==="edit-bill")return openForm("bill",b.dataset.id);
+  if(act==="edit-goal")return openForm("goal",b.dataset.id);
+  if(act==="seg"){flowSeg=b.dataset.v;render();return;}
+  if(act==="balances"){if(!sample&&plan.accounts.length)openBalances();return;}
+  if(act==="go"){const go=b.dataset.go,seg=b.dataset.seg;if(seg==="balances"){if(!sample)openBalances();return;}if(go==="flow"&&seg)flowSeg=seg;if(go==="learn"&&seg)lessonId=seg;render();if(go)location.hash="#"+go;window.scrollTo(0,0);return;}
+  if(act==="sugg-add"){const s=suggestions().find(x=>x.key===b.dataset.key);if(s)openForm(s.kind,null,{name:s.name,amt:s.amt,freq:s.freq,date:s.next,cat:s.cat||"",_key:s.key});return;}
+  if(act==="sugg-skip"){plan.seen=plan.seen||{};plan.seen[b.dataset.key]=1;save();render();return;}
+  if(act==="go-check"){flowSeg="check";render();location.hash="#flow";window.scrollTo(0,0);return;}
+  if(act==="toggle-all"){showAll=!showAll;render();return;}
+  if(act==="ef"){plan.efMonths=Number(b.dataset.v);save();render();return;}
+  if(act==="add-saving"){const pi=payInfo();if(!(whatIf>0))return;return openForm("bill",null,{name:"Savings transfer",amt:whatIf,freq:pi.inc?pi.inc.freq:"monthly",date:pi.inc?(L.occurrences(pi.inc,TODAY,L.addDays(TODAY,400))[0]||TODAY):TODAY,cat:"savings"});}
+  if(act==="mark"){plan.marks=plan.marks||{};const k=b.dataset.key;if(plan.marks[k]===b.dataset.v)delete plan.marks[k];else plan.marks[k]=b.dataset.v;save();render();return;}
+  if(act==="to-bill"){const r=L.analyse(txs).recurring.find(x=>x.key===b.dataset.key);if(r)openForm("bill",null,{name:r.name,amt:Math.round(r.lastAmt*100)/100,freq:"monthly",date:L.addMonths(r.last,1)<TODAY?L.addMonths(r.last,2):L.addMonths(r.last,1),cat:"fun"});return;}
+  if(act==="swap-src"){txs.forEach(x=>{if(x.s===b.dataset.src)x.a=-x.a;});save();render();return;}
+  if(act==="del-src"){txs=txs.filter(x=>x.s!==b.dataset.src);importNote=null;save();render();return;}
+  if(act==="export")return exportBackup();
+  if(act==="erase"){if(!eraseArmed){eraseArmed=true;b.textContent="Tap again to erase all your numbers";return;}eraseArmed=false;plan=emptyPlan();txs=[];importNote=null;whatIf=null;save();render();return;}
+  if(act==="lesson"){lessonId=b.dataset.id;render();$("#lesson").scrollIntoView({block:"start"});return;}
+  if(act==="open-today"){lessonId=null;render();return;}
+  if(act==="surprise"){const pool=LESSONS.filter(x=>!learn.done[x.id]&&x.id!==lessonId);const p=pool.length?pool:LESSONS;lessonId=p[Math.floor(Math.random()*p.length)].id;render();return;}
+  if(act==="learned"){if(learn.done[b.dataset.id])delete learn.done[b.dataset.id];else learn.done[b.dataset.id]=TODAY;saveLearn();render();return;}
+  if(act==="quiz"){const q=b.closest(".quiz"),a=Number(q.dataset.a);q.querySelectorAll("button").forEach((x,i)=>{x.classList.toggle("right",i===a);x.classList.toggle("wrong",x===b&&i!==a);});const w=$("#quiz-why");w.hidden=false;w.textContent=(Number(b.dataset.i)===a?"Correct. ":"Not quite. ")+w.textContent.replace(/^(Correct\. |Not quite\. )/,"");return;}
+});
+document.addEventListener("input",e=>{
+  if(e.target.id==="wi"){whatIf=Number(e.target.value);$("#wi-val").textContent=money(whatIf);const t=L.totals(plan);$("#wi-out").innerHTML=whatIfOut(t,flowCats(t));return;}
+  const w=e.target.closest(".widget");
+  if(w){const v={};w.querySelectorAll("input").forEach(i=>v[i.dataset.k]=num(i.value));w.querySelector(".out").innerHTML=W[w.dataset.w].calc(v);}
+});
+document.addEventListener("change",e=>{
+  if(e.target.id==="sp-month"){spMonth=e.target.value;render();return;}
+  if(e.target.classList.contains("set-cat")){plan.catMap=plan.catMap||{};plan.catMap[e.target.dataset.key]=e.target.value;save();render();return;}
+  if(e.target.id==="cushion"){plan.cushion=Math.max(0,num(e.target.value));save();render();}
+  if(e.target.id==="wi"){const t=L.totals(plan),f=flowCats(t);renderSave(t,null,f);}
+});
+const TITLES={home:"Home",flow:"Money flow",save:"Save",learn:"Learn",accounts:"Accounts"};
+function route(){
+  let h=location.hash.replace("#","");if(!TITLES[h])h="home";
+  for(const id in TITLES){$("#v-"+id).hidden=id!==h;const a=document.querySelector(`nav a[data-tab="${id}"]`);if(id===h)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");}
+  $("#page-title").textContent=TITLES[h];
+  if(h==="flow")drawFlow();
+  if(h==="learn"&&learn.last!==TODAY){touchLearn();render();}
+}
+window.addEventListener("hashchange",()=>{route();window.scrollTo(0,0);});
+let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(drawFlow,150);});
+
+loadSample();load();render();
+if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
